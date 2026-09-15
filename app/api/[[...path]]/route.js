@@ -1550,8 +1550,28 @@ async function handleRoute(request, { params }) {
 }
 
 // Export all HTTP methods
-export const GET = handleRoute
-export const POST = handleRoute
-export const PUT = handleRoute
-export const DELETE = handleRoute
-export const PATCH = handleRoute
+
+export async function GET(request, context) {
+  const params = await context.params
+  return handleRoute(request, { params })
+}
+
+export async function POST(request, context) {
+  const params = await context.params
+  return handleRoute(request, { params })
+}
+
+export async function PUT(request, context) {
+  const params = await context.params
+  return handleRoute(request, { params })
+}
+
+export async function DELETE(request, context) {
+  const params = await context.params
+  return handleRoute(request, { params })
+}
+
+export async function PATCH(request, context) {
+  const params = await context.params
+  return handleRoute(request, { params })
+}
