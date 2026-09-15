@@ -10,6 +10,7 @@ import {
   DEFAULT_INTEREST_EMOJI,
   slugifyInterest
 } from '@/lib/interests'
+import dynamic from 'force-dynamic'
 
 // MongoDB connection
 let client
