@@ -8,9 +8,10 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp'
 import StepProgress from '@/components/StepProgress'
+import FormBanner from '@/components/FormBanner'
+import Logo from '@/components/Logo'
 import { useEnterSubmit } from '@/hooks/useEnterSubmit'
 import {
-  Radar,
   ArrowRight,
   ArrowLeft,
   Check,
@@ -22,7 +23,6 @@ import {
   Building2,
   Eye,
   EyeOff,
-  AlertCircle,
   PartyPopper,
 } from 'lucide-react'
 import { resolveUniversity } from '@/lib/universities'
@@ -320,15 +320,18 @@ export default function RegisterPage() {
   }
 
   return (
-    <main className="min-h-screen bg-background">
-      <div className="app-column flex min-h-screen flex-col px-6 py-8">
+    <main className="relative min-h-screen overflow-hidden bg-background">
+      {/* Ambient brand flare behind the header, shared with /login and the
+          landing page so the three read as one entrance. */}
+
+      <div className="app-column app-gutter relative flex min-h-screen flex-col py-8">
         {/* Header */}
         <div className="mb-8 flex items-center justify-between">
           {canGoBack ? (
             <button
               onClick={goBack}
               aria-label="Back"
-              className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-800/50 text-slate-400 transition-colors hover:text-white"
+              className="flex h-10 w-10 items-center justify-center rounded-full bg-surface-2 text-ink-muted hover:bg-surface-3 hover:text-ink"
             >
               <ArrowLeft className="h-5 w-5" />
             </button>
@@ -336,49 +339,37 @@ export default function RegisterPage() {
             <div className="w-10" />
           )}
 
-          <div className="flex items-center gap-2">
-            <Radar className="h-6 w-6 text-orange-500" />
-            <span className="text-lg font-bold">iFLARE</span>
-          </div>
+          <Logo size="md" />
 
           <div className="w-10" />
         </div>
 
         <StepProgress steps={STEPS} currentStep={step} />
 
-        {error && (
-          <div className="mb-4 flex items-start gap-2 rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-400">
-            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-            <span>{error}</span>
-          </div>
-        )}
-
-        {info && !error && (
-          <div className="mb-4 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-sm text-emerald-300">
-            {info}
-          </div>
-        )}
+        <FormBanner tone="error">{error}</FormBanner>
+        {!error && <FormBanner tone="success">{info}</FormBanner>}
 
         {/* ---------------- Step 1: University ---------------- */}
         {step === 1 && (
           <div
-            className="flex flex-1 flex-col"
+            key="step-1"
+            className="flex flex-1 animate-fade-in-up flex-col"
             onKeyDown={universityStepKeyDown}
           >
-            <h1 className="mb-2 text-2xl font-bold">Where do you study?</h1>
-            <p className="mb-6 text-slate-400">
+            <h1 className="mb-2 text-3xl font-bold">Where do you study?</h1>
+            <p className="mb-6 text-ink-muted">
               iFLARE only shows you flares from your own campus, so we need to
               know which one that is.
             </p>
 
             <div className="relative mb-3">
-              <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-500" />
+              <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-ink-subtle" />
               <Input
                 value={uniQuery}
                 onChange={(e) => setUniQuery(e.target.value)}
                 placeholder="Search your university"
                 aria-label="Search your university"
-                className="h-14 rounded-xl border-slate-700 bg-slate-800/50 pl-12 text-white placeholder:text-slate-500 focus:border-orange-500"
+                className="h-14 rounded-xl pl-12"
               />
             </div>
 
@@ -391,32 +382,32 @@ export default function RegisterPage() {
                     type="button"
                     onClick={() => handleSelectUniversity(uni)}
                     aria-pressed={selected}
-                    className={`flex w-full items-center gap-3 rounded-xl border px-4 py-3 text-left transition-colors ${
+                    className={`flex w-full items-center gap-3 rounded-xl border px-4 py-3 text-left ${
                       selected
-                        ? 'border-orange-500 bg-orange-500/10'
-                        : 'border-slate-700 bg-slate-800/40 hover:bg-slate-800/70'
+                        ? 'border-brand-500 bg-brand-500/10 hover:bg-brand-500/20'
+                        : 'border-line-subtle bg-surface-1 hover:bg-surface-2'
                     }`}
                   >
                     <Building2
                       className={`h-4 w-4 shrink-0 ${
-                        selected ? 'text-orange-400' : 'text-slate-500'
+                        selected ? 'text-brand-400' : 'text-ink-subtle'
                       }`}
                     />
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm font-medium text-white">
+                      <span className="block truncate text-sm font-medium text-ink">
                         {uni.name}
                       </span>
-                      <span className="block truncate text-xs text-slate-500">
+                      <span className="block truncate text-xs text-ink-subtle">
                         {uni.domains.join(' · ')}
                       </span>
                     </span>
-                    {selected && <Check className="h-4 w-4 shrink-0 text-orange-400" />}
+                    {selected && <Check className="h-4 w-4 shrink-0 text-brand-400" />}
                   </button>
                 )
               })}
 
               {uniResults.length === 0 && (
-                <p className="px-1 py-3 text-sm text-slate-500">
+                <p className="px-1 py-3 text-sm text-ink-subtle">
                   No match for &ldquo;{uniQuery}&rdquo;. Your university may
                   still work — pick the option below.
                 </p>
@@ -427,46 +418,44 @@ export default function RegisterPage() {
                 type="button"
                 onClick={() => handleSelectUniversity(OTHER_UNIVERSITY)}
                 aria-pressed={Boolean(university?.other)}
-                className={`flex w-full items-center gap-3 rounded-xl border border-dashed px-4 py-3 text-left transition-colors ${
+                className={`flex w-full items-center gap-3 rounded-xl border border-dashed px-4 py-3 text-left ${
                   university?.other
-                    ? 'border-orange-500 bg-orange-500/10'
-                    : 'border-slate-700 bg-slate-800/20 hover:bg-slate-800/50'
+                    ? 'border-brand-500 bg-brand-500/10 hover:bg-brand-500/20'
+                    : 'border-line bg-surface-1/60 hover:bg-surface-2'
                 }`}
               >
                 <Building2
                   className={`h-4 w-4 shrink-0 ${
-                    university?.other ? 'text-orange-400' : 'text-slate-500'
+                    university?.other ? 'text-brand-400' : 'text-ink-subtle'
                   }`}
                 />
                 <span className="min-w-0 flex-1">
-                  <span className="block text-sm font-medium text-white">
+                  <span className="block text-sm font-medium text-ink">
                     {OTHER_UNIVERSITY.name}
                   </span>
-                  <span className="block text-xs text-slate-500">
+                  <span className="block text-xs text-ink-subtle">
                     Any .ac.in or .edu.in email works
                   </span>
                 </span>
-                {university?.other && <Check className="h-4 w-4 shrink-0 text-orange-400" />}
+                {university?.other && <Check className="h-4 w-4 shrink-0 text-brand-400" />}
               </button>
             </div>
 
             <div className="mt-auto pt-4">
-              <Button
-                onClick={handleUniversityContinue}
-                disabled={!university}
-                className="h-14 w-full rounded-2xl bg-orange-600 text-lg font-semibold text-white hover:bg-orange-700 disabled:opacity-50"
-              >
+              {/* Not disabled: its "pick your university" branch was otherwise
+                  unreachable, which left a grey button as the only explanation. */}
+              <Button size="lg" className="w-full" onClick={handleUniversityContinue}>
                 Continue
-                <ArrowRight className="ml-2 h-5 w-5" />
+                <ArrowRight className="h-5 w-5" />
               </Button>
 
-              <p className="mt-6 text-center text-sm text-slate-500">
+              <p className="mt-6 text-center text-sm text-ink-subtle">
                 Already have an account?{' '}
                 <Link
                   href="/login"
-                  className="font-medium text-orange-400 transition-colors hover:text-orange-300"
+                  className="font-medium text-brand-400 hover:text-brand-300"
                 >
-                  Sign In
+                  Sign in
                 </Link>
               </p>
             </div>
@@ -476,14 +465,15 @@ export default function RegisterPage() {
         {/* ---------------- Step 2: Account ---------------- */}
         {step === 2 && (
           <form
-            className="flex flex-1 flex-col"
+            key="step-2"
+            className="flex flex-1 animate-fade-in-up flex-col"
             onSubmit={(e) => {
               e.preventDefault()
               handleAccountContinue()
             }}
           >
-            <h1 className="mb-2 text-2xl font-bold">Create your account</h1>
-            <p className="mb-6 text-slate-400">
+            <h1 className="mb-2 text-3xl font-bold">Create your account</h1>
+            <p className="mb-6 text-ink-muted">
               {university?.other
                 ? 'Use your university email address.'
                 : `Use your ${university?.name} email address.`}
@@ -491,11 +481,11 @@ export default function RegisterPage() {
 
             <div className="mb-6 space-y-4">
               <div>
-                <label htmlFor="name" className="mb-2 block text-sm text-slate-400">
+                <label htmlFor="name" className="mb-2 block text-sm text-ink-muted">
                   Nickname
                 </label>
                 <div className="relative">
-                  <User className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-500" />
+                  <User className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-ink-subtle" />
                   <Input
                     id="name"
                     name="name"
@@ -503,20 +493,20 @@ export default function RegisterPage() {
                     value={formData.name}
                     onChange={handleInputChange}
                     placeholder="What should people call you?"
-                    className="h-14 rounded-xl border-slate-700 bg-slate-800/50 pl-12 text-white placeholder:text-slate-500 focus:border-orange-500"
+                    className="h-14 rounded-xl pl-12"
                   />
                 </div>
-                <p className="mt-2 text-xs text-slate-500">
+                <p className="mt-2 text-xs text-ink-subtle">
                   Shown to people on flares you host or join.
                 </p>
               </div>
 
               <div>
-                <label htmlFor="email" className="mb-2 block text-sm text-slate-400">
+                <label htmlFor="email" className="mb-2 block text-sm text-ink-muted">
                   University email
                 </label>
                 <div className="relative">
-                  <Mail className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-500" />
+                  <Mail className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-ink-subtle" />
                   <Input
                     id="email"
                     name="email"
@@ -529,17 +519,17 @@ export default function RegisterPage() {
                         ? 'you@university.ac.in'
                         : `you@${university?.domains?.[0] ?? 'university.ac.in'}`
                     }
-                    className="h-14 rounded-xl border-slate-700 bg-slate-800/50 pl-12 text-white placeholder:text-slate-500 focus:border-orange-500"
+                    className="h-14 rounded-xl pl-12"
                   />
                 </div>
               </div>
 
               <div>
-                <label htmlFor="password" className="mb-2 block text-sm text-slate-400">
+                <label htmlFor="password" className="mb-2 block text-sm text-ink-muted">
                   Password
                 </label>
                 <div className="relative">
-                  <Lock className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-500" />
+                  <Lock className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-ink-subtle" />
                   <Input
                     id="password"
                     name="password"
@@ -548,13 +538,13 @@ export default function RegisterPage() {
                     value={formData.password}
                     onChange={handleInputChange}
                     placeholder="At least 6 characters"
-                    className="h-14 rounded-xl border-slate-700 bg-slate-800/50 pl-12 pr-12 text-white placeholder:text-slate-500 focus:border-orange-500"
+                    className="h-14 rounded-xl pl-12 pr-12"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
                     aria-label={showPassword ? 'Hide password' : 'Show password'}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300"
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-ink-subtle hover:text-ink"
                   >
                     {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                   </button>
@@ -563,43 +553,39 @@ export default function RegisterPage() {
             </div>
 
             <div className="mt-auto pt-4">
-              <Button
-                type="submit"
-                disabled={isLoading}
-                className="h-14 w-full rounded-2xl bg-orange-600 text-lg font-semibold text-white hover:bg-orange-700 disabled:opacity-50"
-              >
+              <Button type="submit" size="lg" className="w-full" disabled={isLoading}>
                 {isLoading ? (
-                  <span className="flex items-center gap-2">
+                  <>
                     <Loader2 className="h-5 w-5 animate-spin" />
                     Sending code...
-                  </span>
+                  </>
                 ) : (
                   <>
                     Continue
-                    <ArrowRight className="ml-2 h-5 w-5" />
+                    <ArrowRight className="h-5 w-5" />
                   </>
                 )}
               </Button>
 
-              <p className="mt-4 text-center text-xs leading-relaxed text-slate-500">
+              <p className="mt-4 text-center text-xs leading-relaxed text-ink-subtle">
                 By continuing you agree to our{' '}
-                <Link href="/terms" className="text-slate-400 underline hover:text-slate-300">
+                <Link href="/terms" className="text-ink-muted underline hover:text-ink">
                   Terms
                 </Link>{' '}
                 and{' '}
-                <Link href="/privacy" className="text-slate-400 underline hover:text-slate-300">
+                <Link href="/privacy" className="text-ink-muted underline hover:text-ink">
                   Privacy Policy
                 </Link>
                 .
               </p>
 
-              <p className="mt-4 text-center text-sm text-slate-500">
+              <p className="mt-4 text-center text-sm text-ink-subtle">
                 Already have an account?{' '}
                 <Link
                   href="/login"
-                  className="font-medium text-orange-400 transition-colors hover:text-orange-300"
+                  className="font-medium text-brand-400 hover:text-brand-300"
                 >
-                  Sign In
+                  Sign in
                 </Link>
               </p>
             </div>
@@ -608,11 +594,15 @@ export default function RegisterPage() {
 
         {/* ---------------- Step 3: OTP ---------------- */}
         {step === 3 && (
-          <div className="flex flex-1 flex-col" onKeyDown={otpStepKeyDown}>
-            <h1 className="mb-2 text-2xl font-bold">Check your inbox</h1>
-            <p className="mb-8 text-slate-400">
+          <div
+            key="step-3"
+            className="flex flex-1 animate-fade-in-up flex-col"
+            onKeyDown={otpStepKeyDown}
+          >
+            <h1 className="mb-2 text-3xl font-bold">Check your inbox</h1>
+            <p className="mb-8 text-ink-muted">
               We sent a 6-digit code to{' '}
-              <span className="font-medium text-white">
+              <span className="font-medium text-ink">
                 {formData.email.trim().toLowerCase()}
               </span>
               .
@@ -634,7 +624,7 @@ export default function RegisterPage() {
                     <InputOTPSlot
                       key={i}
                       index={i}
-                      className="h-14 w-12 border-slate-700 bg-slate-800/50 text-lg text-white"
+                      className="tabular h-14 w-12 border-line bg-surface-3 text-lg text-ink shadow-e1 first:rounded-l-lg last:rounded-r-lg"
                     />
                   ))}
                 </InputOTPGroup>
@@ -646,7 +636,7 @@ export default function RegisterPage() {
                 type="button"
                 onClick={handleResendOtp}
                 disabled={resendCooldown > 0 || resendLoading}
-                className="text-sm text-orange-400 transition-colors hover:text-orange-300 disabled:text-slate-600"
+                className="text-sm text-brand-400 hover:text-brand-300 disabled:text-ink-disabled"
               >
                 {resendLoading
                   ? 'Sending...'
@@ -657,16 +647,19 @@ export default function RegisterPage() {
             </div>
 
             <div className="mt-auto pt-6">
+              {/* Only the in-flight state disables this: with the code short,
+                  pressing it is how the user asks what's wrong. */}
               <Button
+                size="lg"
+                className="w-full"
                 onClick={() => handleVerifyOtp()}
-                disabled={otp.length !== 6 || isLoading}
-                className="h-14 w-full rounded-2xl bg-orange-600 text-lg font-semibold text-white hover:bg-orange-700 disabled:opacity-50"
+                disabled={isLoading}
               >
                 {isLoading ? (
-                  <span className="flex items-center gap-2">
+                  <>
                     <Loader2 className="h-5 w-5 animate-spin" />
                     Verifying...
-                  </span>
+                  </>
                 ) : (
                   'Verify'
                 )}
@@ -675,7 +668,7 @@ export default function RegisterPage() {
               <button
                 type="button"
                 onClick={() => setStep(2)}
-                className="mt-4 w-full text-center text-sm text-slate-500 transition-colors hover:text-slate-300"
+                className="mt-4 w-full text-center text-sm text-ink-subtle hover:text-ink"
               >
                 Wrong email? Change it
               </button>
@@ -685,14 +678,14 @@ export default function RegisterPage() {
 
         {/* ---------------- Step 4: Personalisation ---------------- */}
         {step === 4 && (
-          <div className="flex flex-1 flex-col">
-            <div className="mb-6 flex items-center gap-2 text-emerald-400">
+          <div key="step-4" className="flex flex-1 animate-fade-in-up flex-col">
+            <div className="mb-6 flex items-center gap-2 text-success">
               <PartyPopper className="h-5 w-5" />
               <span className="text-sm font-medium">You&apos;re in!</span>
             </div>
 
-            <h1 className="mb-2 text-2xl font-bold">Finish your profile</h1>
-            <p className="mb-6 text-slate-400">
+            <h1 className="mb-2 text-3xl font-bold">Finish your profile</h1>
+            <p className="mb-6 text-ink-muted">
               Pick at least {MIN_INTERESTS} interests — they decide which flares
               show up in your feed. Add your own if something is missing.
             </p>
@@ -709,8 +702,8 @@ export default function RegisterPage() {
             />
 
             <div className="mb-2">
-              <label htmlFor="bio" className="mb-2 block text-sm text-slate-400">
-                Short bio <span className="text-slate-500">(optional)</span>
+              <label htmlFor="bio" className="mb-2 block text-sm text-ink-muted">
+                Short bio <span className="text-ink-subtle">(optional)</span>
               </label>
               {/* No Enter-to-submit here on purpose: Enter inserts a newline. */}
               <Textarea
@@ -719,9 +712,9 @@ export default function RegisterPage() {
                 onChange={(e) => setBio(e.target.value.slice(0, BIO_MAX_LENGTH))}
                 rows={4}
                 placeholder="Second year CS. Usually at the gym or the library. Always up for chai."
-                className="resize-y rounded-xl border-slate-700 bg-slate-800/50 text-white placeholder:text-slate-500 focus:border-orange-500"
+                className="resize-y rounded-xl"
               />
-              <p className="mt-2 text-right text-xs text-slate-500">
+              <p className="tabular mt-2 text-right text-xs text-ink-subtle">
                 {bio.length}/{BIO_MAX_LENGTH}
               </p>
             </div>
@@ -730,19 +723,20 @@ export default function RegisterPage() {
               {/* One primary action, no Skip: without interests the feed has
                   nothing to match against, so /flares would open empty. */}
               <Button
+                size="lg"
+                className="w-full"
                 onClick={handleSavePersonalisation}
-                disabled={selectedInterests.length < MIN_INTERESTS || isLoading}
-                className="h-14 w-full rounded-2xl bg-orange-600 text-lg font-semibold text-white hover:bg-orange-700 disabled:opacity-50"
+                disabled={isLoading}
               >
                 {isLoading ? (
-                  <span className="flex items-center gap-2">
+                  <>
                     <Loader2 className="h-5 w-5 animate-spin" />
                     Saving...
-                  </span>
+                  </>
                 ) : (
                   <>
                     Continue
-                    <ArrowRight className="ml-2 h-5 w-5" />
+                    <ArrowRight className="h-5 w-5" />
                   </>
                 )}
               </Button>

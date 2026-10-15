@@ -186,7 +186,7 @@ export default function InterestSelector({
       )}
 
       <div className="relative">
-        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-subtle" />
         <Input
           value={query}
           onChange={(e) => {
@@ -198,14 +198,18 @@ export default function InterestSelector({
           aria-label="Search or add an interest"
           autoFocus={autoFocus}
           maxLength={INTEREST_NAME_MAX_LENGTH}
-          className="h-11 rounded-xl border-slate-700 bg-slate-800/50 pl-9 text-white placeholder:text-slate-500 focus:border-orange-500"
+          className="pl-9"
         />
         {creating && (
-          <Loader2 className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-slate-500" />
+          <Loader2 className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-ink-subtle" />
         )}
       </div>
 
-      {error && <p className="mt-2 text-sm text-red-400">{error}</p>}
+      {error && (
+        <p role="alert" className="mt-2 text-sm text-danger">
+          {error}
+        </p>
+      )}
 
       <div className="mt-3 flex flex-wrap gap-2">
         {showCreate && (
@@ -213,7 +217,7 @@ export default function InterestSelector({
             type="button"
             onClick={commitQuery}
             disabled={creating}
-            className="inline-flex items-center gap-1.5 rounded-full border border-dashed border-orange-500/50 px-3.5 py-2 text-sm font-medium text-orange-300 transition-colors hover:bg-orange-500/10 disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 rounded-full border border-dashed border-brand-500/50 px-3.5 py-2 text-sm font-medium text-brand-300 transition-colors hover:bg-brand-500/10 disabled:opacity-50"
           >
             <Plus className="h-3.5 w-3.5" />
             Add &ldquo;{trimmedQuery}&rdquo;
@@ -229,7 +233,7 @@ export default function InterestSelector({
         ))}
 
         {!showCreate && suggestions.length === 0 && !loading && (
-          <p className="py-1 text-sm text-slate-500">
+          <p className="py-1 text-sm text-ink-subtle">
             {trimmedQuery
               ? `No interest matches “${trimmedQuery}”.`
               : 'Everything is already selected.'}
@@ -238,8 +242,8 @@ export default function InterestSelector({
       </div>
 
       {min > 0 && (
-        <p className="mt-3 text-sm text-slate-500">
-          {value.length} selected
+        <p className="mt-3 text-sm text-ink-subtle">
+          <span className="tabular">{value.length}</span> selected
           {remaining > 0 && ` · ${remaining} more to go`}
         </p>
       )}

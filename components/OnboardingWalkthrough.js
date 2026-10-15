@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useCallback, useState, useEffect, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import {
   Radar,
@@ -16,6 +16,29 @@ import {
 // Scoped per account: a shared laptop shouldn't swallow the walkthrough for
 // the next person who signs in, and a returning user shouldn't see it again.
 const storageKeyFor = (userId) => `iflare_onboarding_seen:${userId}`
+
+// How /settings asks for the guide back. The panel is mounted in AppShell,
+// which survives navigation inside the (app) group, so clearing the flag alone
+// would do nothing until the next full page load — the component that reads it
+// has long since mounted. An event reaches the live instance instead.
+const REPLAY_EVENT = 'iflare:replay-onboarding'
+
+/**
+ * Reopen the guide for `userId`.
+ *
+ * Returns false when there is no user to scope the flag to, so the caller can
+ * skip its confirmation rather than promising something that won't happen.
+ */
+export function replayOnboarding(userId) {
+  if (!userId || typeof window === 'undefined') return false
+  try {
+    window.localStorage.removeItem(storageKeyFor(userId))
+  } catch (e) {
+    return false // storage blocked — the flag can't be cleared, so don't claim it was
+  }
+  window.dispatchEvent(new CustomEvent(REPLAY_EVENT))
+  return true
+}
 
 const SLIDES = [
   {
@@ -48,6 +71,10 @@ const SLIDES = [
  * and fully usable while it's open. It opens by asking whether the user wants a
  * guide at all, and any click outside it — or Escape, or Skip — finishes it for
  * good.
+ *
+ * It is also the first thing a new user reads, and it used to run entirely at
+ * the app's *smallest* type: `text-xs` body copy above `h-9 text-xs` buttons,
+ * i.e. smaller than anything it was explaining. It is on the normal scale now.
  */
 export default function OnboardingWalkthrough() {
   const [visible, setVisible] = useState(false)
@@ -73,18 +100,37 @@ export default function OnboardingWalkthrough() {
     }
   }, [])
 
-  const dismiss = () => {
+  // Settings can ask for the tour back. Reset to the first slide rather than
+  // resuming wherever the last run stopped — a replay is a fresh read.
+  useEffect(() => {
+    const onReplay = () => {
+      setStage('ask')
+      setStep(0)
+      setVisible(true)
+    }
+    window.addEventListener(REPLAY_EVENT, onReplay)
+    return () => window.removeEventListener(REPLAY_EVENT, onReplay)
+  }, [])
+
+  // `useCallback` because the listener effect below depends on it, and an
+  // identity that changed every render would put that effect back where it
+  // started: re-subscribing three document listeners on every single render.
+  const dismiss = useCallback(() => {
     try {
       if (userId) window.localStorage.setItem(storageKeyFor(userId), '1')
     } catch (e) {
       // ignore
     }
     setVisible(false)
-  }
+  }, [userId])
 
   // Escape and any click outside the panel both leave the tour. There's no
   // overlay to click, so the outside click is detected on the document —
   // which keeps the rest of the app clickable while the panel is open.
+  //
+  // The dependency array is the fix, not an addition: without one, all three
+  // listeners were removed and re-registered on every render of a component
+  // that re-renders on every step of the tour.
   useEffect(() => {
     if (!visible) return
 
@@ -103,7 +149,7 @@ export default function OnboardingWalkthrough() {
       document.removeEventListener('mousedown', onPointerDown)
       document.removeEventListener('touchstart', onPointerDown)
     }
-  })
+  }, [visible, dismiss])
 
   if (!visible) return null
 
@@ -112,11 +158,11 @@ export default function OnboardingWalkthrough() {
       ref={panelRef}
       role="dialog"
       aria-label="Welcome guide"
-      className="fixed bottom-4 left-4 right-4 z-50 rounded-2xl border border-slate-700 bg-slate-900 p-4 shadow-2xl shadow-black/60 sm:left-auto sm:bottom-6 sm:right-6 sm:w-[21rem]"
+      className="fixed bottom-4 left-4 right-4 z-50 animate-sheet-up rounded-2xl border border-line bg-surface-2 p-5 shadow-e4 sm:bottom-6 sm:left-auto sm:right-6 sm:w-[22rem]"
     >
       <button
         onClick={dismiss}
-        className="absolute right-3 top-3 flex h-7 w-7 items-center justify-center rounded-md text-slate-500 transition-colors hover:bg-slate-800 hover:text-white"
+        className="absolute right-2.5 top-2.5 flex h-9 w-9 items-center justify-center rounded-lg text-ink-subtle transition-colors hover:bg-surface-3 hover:text-ink"
         aria-label={stage === 'ask' ? 'Dismiss' : 'Skip guide'}
       >
         <X className="h-4 w-4" />
@@ -131,37 +177,36 @@ export default function OnboardingWalkthrough() {
   )
 }
 
+/** The header both stages share: a tinted icon tile beside the title. */
+function PanelHeading({ icon: Icon, children }) {
+  return (
+    <div className="mb-3 flex items-center gap-3 pr-8">
+      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-brand-500/30 bg-brand-500/10">
+        <Icon className="h-5 w-5 text-brand-400" strokeWidth={1.75} />
+      </span>
+      <h2 className="font-display text-base font-semibold text-ink">{children}</h2>
+    </div>
+  )
+}
+
 /** The opening prompt — a guide is offered, never forced. */
 function AskStage({ onYes, onNo }) {
   return (
     <>
-      <div className="mb-3 flex items-center gap-2.5 pr-7">
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-orange-500/40 bg-orange-500/10">
-          <Sparkles className="h-4 w-4 text-orange-500" strokeWidth={1.75} />
-        </span>
-        <h2 className="text-sm font-semibold text-white">Welcome to iFLARE</h2>
-      </div>
+      <PanelHeading icon={Sparkles}>Welcome to iFLARE</PanelHeading>
 
-      <p className="mb-4 text-xs leading-relaxed text-slate-400">
+      <p className="mb-4 text-sm leading-relaxed text-ink-muted">
         Want a quick guide? Four short tips on finding flares near you and
         posting your own. Takes about 20 seconds.
       </p>
 
       <div className="flex items-center gap-2">
-        <Button
-          variant="ghost"
-          onClick={onNo}
-          className="h-9 flex-1 rounded-lg border border-slate-800 text-xs text-slate-400 hover:bg-slate-800 hover:text-slate-200"
-        >
+        <Button variant="outline" onClick={onNo} className="flex-1">
           No thanks
         </Button>
-        <Button
-          onClick={onYes}
-          autoFocus
-          className="h-9 flex-1 rounded-lg bg-orange-600 text-xs font-medium text-white hover:bg-orange-700"
-        >
+        <Button onClick={onYes} autoFocus className="flex-1 font-semibold">
           Show me
-          <ArrowRight className="ml-1 h-3.5 w-3.5" />
+          <ArrowRight className="h-4 w-4" />
         </Button>
       </div>
     </>
@@ -170,51 +215,40 @@ function AskStage({ onYes, onNo }) {
 
 function TourStage({ step, onStep, onFinish }) {
   const slide = SLIDES[step]
-  const Icon = slide.icon
   const total = SLIDES.length
   const isLast = step === total - 1
 
   return (
     <>
-      <div className="mb-3 flex items-center gap-2.5 pr-7">
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-orange-500/40 bg-orange-500/10">
-          <Icon className="h-4 w-4 text-orange-500" strokeWidth={1.75} />
-        </span>
-        <h2 className="text-sm font-semibold text-white">{slide.title}</h2>
-      </div>
+      <PanelHeading icon={slide.icon}>{slide.title}</PanelHeading>
 
-      <p className="mb-3 text-xs leading-relaxed text-slate-400">{slide.body}</p>
+      {/* Keyed so each slide fades in rather than swapping its text in place. */}
+      <p key={step} className="mb-4 animate-fade-in text-sm leading-relaxed text-ink-muted">
+        {slide.body}
+      </p>
 
       <div className="mb-4 flex items-center gap-1.5">
         {SLIDES.map((_, i) => (
           <span
             key={i}
-            className={`h-1 rounded-full transition-all ${
-              i === step ? 'w-4 bg-orange-500' : 'w-1 bg-slate-700'
+            className={`h-1 rounded-full transition-all duration-200 ease-out-quart ${
+              i === step ? 'w-5 bg-brand-500' : 'w-1.5 bg-surface-3'
             }`}
           />
         ))}
-        <span className="ml-auto text-[11px] text-slate-600">
+        <span className="tabular ml-auto text-2xs text-ink-subtle">
           {step + 1} of {total}
         </span>
       </div>
 
       <div className="flex items-center gap-2">
         {step > 0 ? (
-          <Button
-            variant="ghost"
-            onClick={() => onStep(step - 1)}
-            className="h-9 flex-1 rounded-lg border border-slate-800 text-xs text-slate-300 hover:bg-slate-800 hover:text-white"
-          >
-            <ArrowLeft className="mr-1 h-3.5 w-3.5" />
+          <Button variant="outline" onClick={() => onStep(step - 1)} className="flex-1">
+            <ArrowLeft className="h-4 w-4" />
             Back
           </Button>
         ) : (
-          <Button
-            variant="ghost"
-            onClick={onFinish}
-            className="h-9 flex-1 rounded-lg border border-slate-800 text-xs text-slate-400 hover:bg-slate-800 hover:text-slate-200"
-          >
+          <Button variant="outline" onClick={onFinish} className="flex-1">
             Skip
           </Button>
         )}
@@ -222,10 +256,10 @@ function TourStage({ step, onStep, onFinish }) {
         <Button
           onClick={() => (isLast ? onFinish() : onStep(step + 1))}
           autoFocus
-          className="h-9 flex-1 rounded-lg bg-orange-600 text-xs font-medium text-white hover:bg-orange-700"
+          className="flex-1 font-semibold"
         >
-          {isLast ? "Let's go" : 'Continue'}
-          {!isLast && <ArrowRight className="ml-1 h-3.5 w-3.5" />}
+          {isLast ? 'Let’s go' : 'Continue'}
+          {!isLast && <ArrowRight className="h-4 w-4" />}
         </Button>
       </div>
     </>

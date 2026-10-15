@@ -4,8 +4,21 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Radar, ArrowRight, ArrowLeft, Mail, Lock, Loader2, Eye, EyeOff } from 'lucide-react'
+import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp'
+import StepProgress from '@/components/StepProgress'
+import FormBanner from '@/components/FormBanner'
+import Logo from '@/components/Logo'
+import { ArrowRight, ArrowLeft, Mail, Lock, Loader2, Eye, EyeOff } from 'lucide-react'
 import { resolveUniversity } from '@/lib/universities'
+
+/*
+ * The reset flow is the same shape as signup's — email, then a 6-digit code —
+ * so it now uses the same parts. It previously ran on a bespoke two-bar
+ * progress indicator, a plain text field with tracking-[0.5em] standing in for
+ * the OTP input, an orange info banner where /register used emerald, a
+ * placeholder hardcoded to one institution, and no htmlFor/id on any field.
+ */
+const STEPS = ['Email', 'New password']
 
 export default function ForgotPasswordPage() {
   const router = useRouter()
@@ -72,8 +85,9 @@ export default function ForgotPasswordPage() {
     }
   }
 
-  const verifyAndReset = async () => {
-    if (!/^\d{6}$/.test(otp.trim())) {
+  const verifyAndReset = async (submittedOtp) => {
+    const code = (submittedOtp ?? otp).trim()
+    if (!/^\d{6}$/.test(code)) {
       setError('Enter the 6-digit code from your email')
       return
     }
@@ -89,7 +103,7 @@ export default function ForgotPasswordPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           email: email.trim(),
-          otp: otp.trim(),
+          otp: code,
           newPassword,
         }),
       })
@@ -98,7 +112,7 @@ export default function ForgotPasswordPage() {
         setError(data.error || 'Reset failed')
         return
       }
-      // Success — bounce back to /login with a small hint via query
+      // Back to sign-in, where ?reset=1 is now actually read and confirmed.
       router.push('/login?reset=1')
     } catch (e) {
       setError('Something went wrong. Please try again.')
@@ -113,162 +127,191 @@ export default function ForgotPasswordPage() {
   }
 
   return (
-    <main className="min-h-screen bg-background px-6 py-8 flex flex-col">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-8">
-        <button
-          onClick={() => {
-            if (step === 1) router.push('/login')
-            else setStep(1)
-          }}
-          className="w-10 h-10 rounded-full bg-slate-800/50 flex items-center justify-center text-slate-400 hover:text-white transition-colors"
-        >
-          <ArrowLeft className="w-5 h-5" />
-        </button>
-        <div className="flex items-center gap-2">
-          <Radar className="w-6 h-6 text-orange-500" />
-          <h1 className="text-lg font-bold">iFLARE</h1>
-        </div>
-        <div className="w-10" />
-      </div>
+    <main className="relative min-h-screen overflow-hidden bg-background">
 
-      {/* Progress */}
-      <div className="flex gap-2 mb-8">
-        <div className={`h-1 flex-1 rounded-full ${step >= 1 ? 'bg-orange-500' : 'bg-slate-700'}`} />
-        <div className={`h-1 flex-1 rounded-full ${step >= 2 ? 'bg-orange-500' : 'bg-slate-700'}`} />
-      </div>
-
-      {error && (
-        <div className="mb-4 p-3 bg-red-500/10 border border-red-500/30 rounded-xl text-red-400 text-sm">
-          {error}
-        </div>
-      )}
-      {info && !error && (
-        <div className="mb-4 p-3 bg-orange-500/10 border border-orange-500/30 rounded-xl text-orange-300 text-sm">
-          {info}
-        </div>
-      )}
-
-      {step === 1 && (
-        <div className="flex-1 flex flex-col">
-          <h2 className="text-2xl font-bold mb-2">Reset your password</h2>
-          <p className="text-slate-400 mb-6">
-            Enter your iFLARE college email and we&apos;ll send you a 6-digit code to set a new password.
-          </p>
-
-          <div>
-            <label className="text-sm text-slate-400 mb-2 block">College Email</label>
-            <div className="relative">
-              <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
-              <Input
-                type="email"
-                value={email}
-                onChange={(e) => { setEmail(e.target.value); setError('') }}
-                placeholder="you@sst.scaler.com"
-                className="h-14 pl-12 bg-slate-800/50 border-slate-700 rounded-xl text-white placeholder:text-slate-500 focus:border-orange-500"
-              />
-            </div>
-          </div>
-
-          <div className="mt-auto">
-            <Button
-              onClick={sendResetCode}
-              disabled={!email.trim() || isLoading}
-              className="w-full h-14 bg-orange-600 hover:bg-orange-700 text-white font-semibold text-lg rounded-2xl disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isLoading ? (
-                <span className="flex items-center gap-2">
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                  Sending code...
-                </span>
-              ) : (
-                <>
-                  Send reset code
-                  <ArrowRight className="w-5 h-5 ml-2" />
-                </>
-              )}
-            </Button>
-          </div>
-        </div>
-      )}
-
-      {step === 2 && (
-        <div className="flex-1 flex flex-col">
-          <h2 className="text-2xl font-bold mb-2">Enter your code</h2>
-          <p className="text-slate-400 mb-6">
-            We sent a 6-digit code to <span className="text-orange-400">{email.trim().toLowerCase()}</span>. It expires in 10 minutes.
-          </p>
-
-          <div className="mb-4">
-            <label className="text-sm text-slate-400 mb-2 block">Verification code</label>
-            <Input
-              type="text"
-              inputMode="numeric"
-              autoComplete="one-time-code"
-              maxLength={6}
-              value={otp}
-              onChange={(e) => {
-                setError('')
-                setInfo('')
-                setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))
-              }}
-              placeholder="123456"
-              className="h-14 text-center text-2xl tracking-[0.5em] bg-slate-800/50 border-slate-700 rounded-xl text-white placeholder:text-slate-600 focus:border-orange-500"
-            />
-          </div>
-
-          <div>
-            <label className="text-sm text-slate-400 mb-2 block">New password</label>
-            <div className="relative">
-              <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
-              <Input
-                type={showPassword ? 'text' : 'password'}
-                value={newPassword}
-                onChange={(e) => { setNewPassword(e.target.value); setError('') }}
-                placeholder="Choose a new password"
-                className="h-14 pl-12 pr-12 bg-slate-800/50 border-slate-700 rounded-xl text-white placeholder:text-slate-500 focus:border-orange-500"
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword((s) => !s)}
-                className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300"
-              >
-                {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-              </button>
-            </div>
-            <p className="text-xs text-slate-500 mt-2">At least 6 characters.</p>
-          </div>
-
+      <div className="app-column app-gutter relative flex min-h-screen flex-col py-8">
+        {/* Header */}
+        <div className="mb-8 flex items-center justify-between">
           <button
-            type="button"
-            onClick={handleResend}
-            disabled={resendCooldown > 0 || isLoading}
-            className="mt-4 text-sm text-orange-400 hover:text-orange-300 disabled:text-slate-600 disabled:cursor-not-allowed self-start"
+            onClick={() => {
+              setError('')
+              setInfo('')
+              if (step === 1) router.push('/login')
+              else setStep(1)
+            }}
+            aria-label="Back"
+            className="flex h-10 w-10 items-center justify-center rounded-full bg-surface-2 text-ink-muted hover:bg-surface-3 hover:text-ink"
           >
-            {resendCooldown > 0 ? `Resend code in ${resendCooldown}s` : 'Resend code'}
+            <ArrowLeft className="h-5 w-5" />
           </button>
 
-          <div className="mt-auto">
-            <Button
-              onClick={verifyAndReset}
-              disabled={otp.length !== 6 || newPassword.length < 6 || isLoading}
-              className="w-full h-14 bg-orange-600 hover:bg-orange-700 text-white font-semibold text-lg rounded-2xl disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isLoading ? (
-                <span className="flex items-center gap-2">
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                  Updating password...
-                </span>
-              ) : (
-                <>
-                  Update password
-                  <ArrowRight className="w-5 h-5 ml-2" />
-                </>
-              )}
-            </Button>
-          </div>
+          <Logo size="md" />
+
+          <div className="w-10" />
         </div>
-      )}
+
+        <StepProgress steps={STEPS} currentStep={step} />
+
+        <FormBanner tone="error">{error}</FormBanner>
+        {!error && <FormBanner tone="success">{info}</FormBanner>}
+
+        {step === 1 && (
+          <div key="step-1" className="flex flex-1 animate-fade-in-up flex-col">
+            <h1 className="mb-2 text-3xl font-bold">Reset your password</h1>
+            <p className="mb-6 text-ink-muted">
+              Enter your iFLARE college email and we&apos;ll send you a 6-digit
+              code to set a new password.
+            </p>
+
+            <div>
+              <label htmlFor="reset-email" className="mb-2 block text-sm text-ink-muted">
+                College email
+              </label>
+              <div className="relative">
+                <Mail className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-ink-subtle" />
+                <Input
+                  id="reset-email"
+                  type="email"
+                  autoComplete="email"
+                  value={email}
+                  onChange={(e) => {
+                    setEmail(e.target.value)
+                    setError('')
+                  }}
+                  placeholder="you@university.ac.in"
+                  className="h-14 rounded-xl pl-12"
+                />
+              </div>
+            </div>
+
+            <div className="mt-auto pt-8">
+              <Button
+                size="lg"
+                className="w-full"
+                onClick={sendResetCode}
+                disabled={isLoading}
+              >
+                {isLoading ? (
+                  <>
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                    Sending code...
+                  </>
+                ) : (
+                  <>
+                    Send reset code
+                    <ArrowRight className="h-5 w-5" />
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {step === 2 && (
+          <div key="step-2" className="flex flex-1 animate-fade-in-up flex-col">
+            <h1 className="mb-2 text-3xl font-bold">Enter your code</h1>
+            <p className="mb-6 text-ink-muted">
+              We sent a 6-digit code to{' '}
+              <span className="font-medium text-ink">{email.trim().toLowerCase()}</span>. It
+              expires in 10 minutes.
+            </p>
+
+            <div className="mb-6">
+              <label htmlFor="reset-otp" className="mb-2 block text-sm text-ink-muted">
+                Verification code
+              </label>
+              <InputOTP
+                id="reset-otp"
+                maxLength={6}
+                value={otp}
+                onChange={(value) => {
+                  setOtp(value)
+                  setError('')
+                  setInfo('')
+                }}
+                // The password below is still required, so a complete code
+                // submits only when there is something to submit with it.
+                onComplete={(value) => {
+                  if (newPassword.length >= 6) verifyAndReset(value)
+                }}
+              >
+                <InputOTPGroup>
+                  {[0, 1, 2, 3, 4, 5].map((i) => (
+                    <InputOTPSlot
+                      key={i}
+                      index={i}
+                      className="tabular h-14 w-12 border-line bg-surface-3 text-lg text-ink shadow-e1 first:rounded-l-lg last:rounded-r-lg"
+                    />
+                  ))}
+                </InputOTPGroup>
+              </InputOTP>
+            </div>
+
+            <div>
+              <label htmlFor="reset-password" className="mb-2 block text-sm text-ink-muted">
+                New password
+              </label>
+              <div className="relative">
+                <Lock className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-ink-subtle" />
+                <Input
+                  id="reset-password"
+                  type={showPassword ? 'text' : 'password'}
+                  autoComplete="new-password"
+                  value={newPassword}
+                  onChange={(e) => {
+                    setNewPassword(e.target.value)
+                    setError('')
+                  }}
+                  placeholder="Choose a new password"
+                  aria-describedby="reset-password-hint"
+                  className="h-14 rounded-xl pl-12 pr-12"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((s) => !s)}
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-ink-subtle hover:text-ink"
+                >
+                  {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                </button>
+              </div>
+              <p id="reset-password-hint" className="mt-2 text-xs text-ink-subtle">
+                At least 6 characters.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleResend}
+              disabled={resendCooldown > 0 || isLoading}
+              className="mt-4 self-start text-sm text-brand-400 hover:text-brand-300 disabled:text-ink-disabled"
+            >
+              {resendCooldown > 0 ? `Resend code in ${resendCooldown}s` : 'Resend code'}
+            </button>
+
+            <div className="mt-auto pt-8">
+              <Button
+                size="lg"
+                className="w-full"
+                onClick={() => verifyAndReset()}
+                disabled={isLoading}
+              >
+                {isLoading ? (
+                  <>
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                    Updating password...
+                  </>
+                ) : (
+                  <>
+                    Update password
+                    <ArrowRight className="h-5 w-5" />
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        )}
+      </div>
     </main>
   )
 }

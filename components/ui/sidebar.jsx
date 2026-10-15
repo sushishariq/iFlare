@@ -168,7 +168,12 @@ const Sidebar = React.forwardRef((
         <SheetContent
           data-sidebar="sidebar"
           data-mobile="true"
-          className="w-[--sidebar-width] bg-sidebar p-0 text-sidebar-foreground [&>button]:hidden"
+          // The sheet's own close button is kept, not hidden. It lives inside
+          // the Radix portal, which is the only place a control can still be
+          // clicked: a modal sheet sets `pointer-events: none` on <body>, so an
+          // "X" rendered outside the portal (AppShell used to do this) paints
+          // but is not a hit target.
+          className="w-[--sidebar-width] bg-sidebar p-0 text-sidebar-foreground"
           style={
             {
               "--sidebar-width": SIDEBAR_WIDTH_MOBILE

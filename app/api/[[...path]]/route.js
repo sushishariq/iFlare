@@ -17,14 +17,32 @@ import {
 // MongoDB connection
 let client
 let db
+let connecting
 
 async function connectToMongo() {
-  if (!client) {
-    client = new MongoClient(process.env.MONGO_URL)
-    await client.connect()
-    db = client.db(process.env.DB_NAME || 'iflare')
+  if (db) return db
+
+  // The guard here used to be `if (!client)`, and `client` was assigned
+  // synchronously *before* the connect was awaited — so a second request that
+  // arrived while the first was still connecting saw a truthy `client`, skipped
+  // the block and returned a `db` that was still undefined, failing with
+  // "Cannot read properties of undefined (reading 'collection')". It only
+  // needed two concurrent requests on a cold server to reproduce, which /flares
+  // now does on every load (the feed and the campus interest catalogue).
+  // Caching the in-flight promise makes every caller wait on the same connect.
+  if (!connecting) {
+    connecting = (async () => {
+      client = new MongoClient(process.env.MONGO_URL)
+      await client.connect()
+      db = client.db(process.env.DB_NAME || 'iflare')
+      return db
+    })().catch((err) => {
+      connecting = null // let the next request retry rather than caching a failure
+      throw err
+    })
   }
-  return db
+
+  return connecting
 }
 
 // One-time backfill so legacy users/flares work with the new
@@ -114,7 +132,7 @@ async function assertFlareChatAccess(db, flareId, userId) {
   const isHost = flare?.host?.id === userId
   const isAttendee = Array.isArray(flare.attendees) && flare.attendees.some(a => a.id === userId)
   if (!isHost && !isAttendee) {
-    return { ok: false, status: 403, error: 'Join this iFlare to see its chat' }
+    return { ok: false, status: 403, error: 'Join this flare to see its chat' }
   }
   return { ok: true, flare, user }
 }

@@ -2,18 +2,9 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import {
-  Radar,
-  Bell,
-  CalendarCheck,
-  User,
-  Settings,
-  MessageSquareHeart,
-  Info,
-  Mail,
-  ShieldCheck,
-} from 'lucide-react'
 
+import Logo from '@/components/Logo'
+import UnreadBadge from '@/components/UnreadBadge'
 import {
   Sidebar,
   SidebarContent,
@@ -27,28 +18,35 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarRail,
+  useSidebar,
 } from '@/components/ui/sidebar'
+import { MAIN_ITEMS, SECONDARY_ITEMS, isRouteActive } from '@/lib/navItems'
 import { useNotificationContext } from '@/lib/NotificationProvider'
 
-// `available: false` items are nav destinations the redesign introduces but
-// whose pages land in a later phase — they render disabled rather than as
-// links to a 404. Flip the flag when the page exists.
-const MAIN_ITEMS = [
-  { title: 'Flares', href: '/flares', icon: Radar, available: true },
-  { title: 'My Activity', href: '/activity', icon: CalendarCheck, available: true },
-  { title: 'Notifications', href: '/notifications', icon: Bell, available: true, badge: 'unread' },
-  { title: 'Profile', href: '/profile', icon: User, available: true },
-]
+/*
+ * The selected state.
+ *
+ * Stock shadcn's active row is `bg-sidebar-accent` + `font-medium` — a slate
+ * fill, so the brand colour never appeared in the nav's selected state at all
+ * and the current page read as barely distinct from a hover. This tints the
+ * fill, the label and the icon, and adds the left indicator bar that says
+ * "you are here" before any colour is even parsed.
+ *
+ * The bar is a ::before rather than an element because SidebarMenuButton styles
+ * its *direct* children (`[&>svg]`, `[&>span:last-child]`); an extra child
+ * would be picked up as the label.
+ */
+const ACTIVE_STYLES = [
+  'relative',
+  'before:absolute before:left-0 before:top-1/2 before:h-5 before:w-[3px] before:-translate-y-1/2',
+  'before:rounded-full before:bg-brand-500 before:opacity-0 before:transition-opacity',
+  'data-[active=true]:before:opacity-100',
+  'data-[active=true]:bg-brand-500/10 data-[active=true]:text-brand-300',
+  'data-[active=true]:[&>svg]:text-brand-400',
+  'data-[active=true]:hover:bg-brand-500/15 data-[active=true]:hover:text-brand-300',
+].join(' ')
 
-const SECONDARY_ITEMS = [
-  { title: 'Settings', href: '/settings', icon: Settings, available: true },
-  { title: 'Feedback', href: '/feedback', icon: MessageSquareHeart, available: true },
-  { title: 'About', href: '/about', icon: Info, available: true },
-  { title: 'Contact', href: '/contact', icon: Mail, available: true },
-  { title: 'Privacy Policy', href: '/privacy', icon: ShieldCheck, available: true },
-]
-
-function NavItem({ item, isActive, unreadCount }) {
+function NavItem({ item, isActive, unreadCount, onNavigate }) {
   const Icon = item.icon
   const showBadge = item.badge === 'unread' && unreadCount > 0
 
@@ -64,10 +62,15 @@ function NavItem({ item, isActive, unreadCount }) {
         isActive={isActive}
         tooltip={item.title}
         aria-disabled={!item.available}
-        className={item.available ? undefined : 'cursor-not-allowed opacity-50'}
+        className={
+          item.available ? ACTIVE_STYLES : `${ACTIVE_STYLES} cursor-not-allowed opacity-50`
+        }
       >
         {isLink ? (
-          <Link href={item.href}>
+          // On mobile the sidebar is a modal sheet that does not close itself on
+          // navigation — without this, tapping a row routed the page *behind* a
+          // still-open sheet.
+          <Link href={item.href} onClick={onNavigate}>
             <Icon />
             <span>{item.title}</span>
           </Link>
@@ -79,9 +82,16 @@ function NavItem({ item, isActive, unreadCount }) {
         )}
       </SidebarMenuButton>
       {showBadge && (
-        <SidebarMenuBadge className="bg-orange-500 text-white">
-          {unreadCount > 9 ? '9+' : unreadCount}
-        </SidebarMenuBadge>
+        // SidebarMenuBadge hides itself when the sidebar is collapsed to icons,
+        // so the count would silently vanish; the dot rides on the row instead.
+        <>
+          <SidebarMenuBadge className="p-0">
+            <UnreadBadge count={unreadCount} />
+          </SidebarMenuBadge>
+          <span className="pointer-events-none absolute right-1.5 top-1.5 hidden group-data-[collapsible=icon]:block">
+            <UnreadBadge count={unreadCount} dot />
+          </span>
+        </>
       )}
     </SidebarMenuItem>
   )
@@ -90,8 +100,11 @@ function NavItem({ item, isActive, unreadCount }) {
 export default function AppSidebar() {
   const pathname = usePathname()
   const { unreadCount } = useNotificationContext()
+  const { isMobile, setOpenMobile } = useSidebar()
 
-  const isActive = (href) => href && (pathname === href || pathname?.startsWith(`${href}/`))
+  const isActive = (href) => isRouteActive(pathname, href)
+  // Only the mobile sheet needs dismissing; on desktop the sidebar is permanent.
+  const closeOnNavigate = isMobile ? () => setOpenMobile(false) : undefined
 
   return (
     <Sidebar collapsible="icon">
@@ -99,15 +112,8 @@ export default function AppSidebar() {
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton asChild size="lg">
-              <Link href="/flares">
-                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-orange-600">
-                  <Radar className="h-5 w-5 text-white" />
-                </span>
-                <span className="text-lg font-bold tracking-tight">
-                  <span className="text-slate-400">i</span>
-                  <span className="text-orange-500">FLARE</span>
-                </span>
-              </Link>
+              {/* Logo emits a single <Link>, which is what asChild requires. */}
+              <Logo href="/flares" />
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
@@ -123,6 +129,7 @@ export default function AppSidebar() {
                   item={item}
                   isActive={isActive(item.href)}
                   unreadCount={unreadCount}
+                  onNavigate={closeOnNavigate}
                 />
               ))}
             </SidebarMenu>
@@ -134,7 +141,12 @@ export default function AppSidebar() {
           <SidebarGroupContent>
             <SidebarMenu>
               {SECONDARY_ITEMS.map((item) => (
-                <NavItem key={item.title} item={item} isActive={isActive(item.href)} />
+                <NavItem
+                  key={item.title}
+                  item={item}
+                  isActive={isActive(item.href)}
+                  onNavigate={closeOnNavigate}
+                />
               ))}
             </SidebarMenu>
           </SidebarGroupContent>
@@ -142,7 +154,7 @@ export default function AppSidebar() {
       </SidebarContent>
 
       <SidebarFooter>
-        <p className="px-2 text-xs text-muted-foreground group-data-[collapsible=icon]:hidden">
+        <p className="px-2 text-2xs text-ink-subtle group-data-[collapsible=icon]:hidden">
           Real connections. Right now.
         </p>
       </SidebarFooter>

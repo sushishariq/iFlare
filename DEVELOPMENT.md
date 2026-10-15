@@ -190,7 +190,36 @@ and `{ id: 1 }` unique.
   (cross-campus block). Legacy flares without `hostEmailDomain` skip this
   check to remain usable.
 
-### 5.4 Legacy migration
+### 5.4 `interests` collection
+
+Custom interests a campus has added for itself. The **twelve built-ins are not
+in here** — they ship in `lib/interests.js`, are identical on every campus, and
+their ids are already persisted on existing users and flares; storing a second
+copy per campus would only let the two drift.
+
+```jsonc
+{
+  "_id": ObjectId("…"),
+  "id": "board-games",              // slugifyInterest(name) — the persisted id
+  "name": "Board Games",            // first creator's wording, never overwritten
+  "emoji": "✨",                     // DEFAULT_INTEREST_EMOJI unless supplied
+  "emailDomain": "iitkgp.ac.in",    // the campus this belongs to
+  "createdBy": "3f5a8c7b-…-uuid",
+  "createdAt": ISODate("…")
+}
+```
+
+- Upserted on `{ id, emailDomain }` with `$setOnInsert`, so two students typing
+  "Board Games" and "board games" land on one row and the first wording sticks.
+- A built-in id always wins: `POST /interests` returns the built-in rather than
+  creating a campus-local row that would shadow it.
+- The id is the *only* thing persisted on `users.interests[]` /
+  `flares.interests[]` — a custom interest is a catalogue row, not a different
+  storage shape. `resolveInterest()` de-slugifies an id the catalogue doesn't
+  know (another campus's, or one whose fetch hasn't landed) rather than
+  rendering `board-games` raw.
+
+### 5.5 Legacy migration
 
 On every server start, the first `/api` request triggers
 `ensureMigrated(db)` in `app/api/[[...path]]/route.js`. It:
@@ -330,11 +359,18 @@ production** (see § 8).
 | ------ | ------------------------------ | --------------------------------------------------- | ----- |
 | GET    | `/user/me`                     | Header: `Authorization: Bearer <token>`             | Returns the logged-in user. |
 | PUT    | `/user/interests`              | `{ userId, interests[] }`                           | Requires ≥3 interests. |
-| PUT    | `/user/settings`               | `{ userId, interests?, visibilityMode? }`           | `visibilityMode` is legacy / ignored by the new scoping. |
+| PUT    | `/user/settings`               | `{ userId, interests?, bio?, visibilityMode? }`     | `bio` is ≤300 chars (`BIO_MAX_LENGTH`). `visibilityMode` is legacy / ignored by the new scoping. |
 | GET    | `/user/:userId/activity`       | –                                                   | Returns `{ created: Flare[], joined: Flare[] }`. |
 | GET    | `/user/:userId/flares`         | –                                                   | All flares where user is host OR attendee. |
 
-### 7.3 Flares
+### 7.3 Interests
+
+| Method | Route                          | Body / Params                                       | Notes |
+| ------ | ------------------------------ | --------------------------------------------------- | ----- |
+| GET    | `/interests?userId=<uuid>`     | –                                                   | Returns `{ interests: [{id, name, emoji}] }` — **only this campus's custom interests**, scoped by the caller's `emailDomain`. The client merges them with the built-ins (`mergeInterests`). Max 200, sorted by name. |
+| POST   | `/interests`                   | `{ userId, name, emoji? }`                          | Creates or re-uses a custom interest for the caller's campus. Name is 2–40 chars; the id is `slugifyInterest(name)`. Returns the built-in unchanged if the slug collides with one. Idempotent (upsert on `{id, emailDomain}`). |
+
+### 7.4 Flares
 
 | Method | Route                          | Body / Params                                                                                                          | Notes |
 | ------ | ------------------------------ | ---------------------------------------------------------------------------------------------------------------------- | ----- |
@@ -363,7 +399,7 @@ Current MVP uses lightweight primitives that are **not production-grade**:
   → Restrict via `CORS_ORIGINS` env var in production.
 - **Rate limiting:** none.
   → Add on `/auth/*` and `/flares` POSTs.
-- **Cross-university join:** not enforced at the join endpoint (see § 7.3).
+- **Cross-university join:** not enforced at the join endpoint (see § 7.4).
 - **Email verification:** intentionally disabled.
   → Re-enable when going live.
 
@@ -443,7 +479,13 @@ needed for `.env` changes or new npm dependencies.
 
 - Re-enable email verification via Resend.
 - Google Login (postponed).
-- Google Maps venue picker (currently free-text `location.name`).
+- Google Maps venue picker (venue names now come from `lib/campusLocations.js`;
+  `location.lat`/`lng` are null and nothing renders a map).
+- **Campus venues must become university-specific.** `lib/campusLocations.js` is
+  one global list of generic names shared by every campus — the only part of the
+  product that isn't university-scoped. The natural shape is the one this doc's
+  § 5.4 `interests` collection already uses: documents keyed by `emailDomain`,
+  with the current array as the fallback for a campus that hasn't added its own.
 - Password reset flow.
 - Cross-university join enforcement at `/flares/:id/join`.
 - Server-side push notifications.
@@ -454,5 +496,5 @@ needed for `.env` changes or new npm dependencies.
 
 ---
 
-*Last updated: Feb 2026 — this doc lives at `/app/DEVELOPMENT.md`. Keep it
+*Last updated: Sep 2026 — this doc lives at `/app/DEVELOPMENT.md`. Keep it
 in sync when the schema or endpoints change.*

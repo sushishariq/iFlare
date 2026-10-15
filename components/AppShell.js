@@ -1,102 +1,112 @@
 'use client'
 
-import Link from 'next/link'
-import { Menu, Radar, X } from 'lucide-react'
+import { usePathname } from 'next/navigation'
+import { Menu } from 'lucide-react'
 
 import AppSidebar from '@/components/AppSidebar'
+import AppTopBar from '@/components/AppTopBar'
+import MobileTabBar from '@/components/MobileTabBar'
 import OnboardingWalkthrough from '@/components/OnboardingWalkthrough'
 import SwipeToToggleSidebar from '@/components/SwipeToToggleSidebar'
 import { SidebarInset, SidebarProvider, useSidebar } from '@/components/ui/sidebar'
+import { AppChromeProvider } from '@/lib/AppChromeProvider'
+import { cn } from '@/lib/utils'
 
 /**
- * The authenticated application chrome: sidebar, mobile header, onboarding.
+ * The authenticated application chrome: sidebar, top bar, tab bar, onboarding.
  *
- * Extracted out of app/(app)/layout.js so the informational pages (About,
- * Contact, Feedback, Privacy, Terms) can reuse it. Those routes live *outside*
- * the (app) group — the logged-out landing footer links to them, so they can't
- * assume a session — but a logged-in user opening one from the sidebar must not
- * lose the sidebar. InfoPageShell decides which chrome to wrap its content in;
- * this component is the authenticated half.
+ * Rendered by app/(app)/layout.js for every route in the (app) group. The
+ * informational pages exist twice — public copies at /about etc. that never
+ * touch this, and in-app copies at /info/* that are inside the group and so get
+ * this shell from the layout, server-side. That replaced a single shell which
+ * chose its chrome from localStorage after mount and flashed the logged-out
+ * page at every signed-in visitor.
  *
- * Layout intent, unchanged: one mobile-style vertical column at every viewport.
- * Desktop spends its extra width on the sidebar, not on a wider column.
+ * Layout intent (changed in Phase C): the single mobile-style column is still
+ * the default, but it is no longer the *only* option. A page with a real
+ * desktop layout — the feed beside a persistent detail pane, a two-column form
+ * — opts into the wider canvas by being listed below. Everything else keeps the
+ * reading column, because a 68rem-wide list of settings rows is worse, not
+ * better, than a 34rem one.
  */
+
+// Route-driven rather than page-driven on purpose: a page that announced its
+// own width through context could only do so *after* mount, which is one
+// hydration frame of the wrong layout and a visible reflow. The route is known
+// on the server.
+const WIDE_ROUTES = ['/flares', '/activity', '/profile', '/settings']
+
 export default function AppShell({ children }) {
+  const pathname = usePathname()
+  const isWide = WIDE_ROUTES.includes(pathname)
+
   return (
-    <SidebarProvider>
-      <AppSidebar />
+    <AppChromeProvider>
+      <SidebarProvider>
+        <AppSidebar />
 
-      <SidebarInset>
-        {/* The sidebar collapses to an off-canvas sheet below md, so mobile
-            needs a persistent affordance to open it. */}
-        <MobileSidebarToggle />
+        <SidebarInset>
+          {/* The sidebar collapses to an off-canvas sheet below md, so mobile
+              needs a persistent affordance to open it. */}
+          <MobileSidebarToggle />
 
-        <div className="sticky top-0 z-30 flex h-16 items-center gap-3 border-b border-slate-800/60 bg-slate-950/90 px-3 backdrop-blur md:hidden">
-          {/* Reserves the space the fixed toggle sits in, so nothing shifts
-              when the icon swaps. */}
-          <span aria-hidden className="w-11 shrink-0" />
-          <Brand />
-        </div>
+          <AppTopBar />
 
-        <div className="app-column flex-1 px-4 pb-10 pt-4">{children}</div>
-      </SidebarInset>
+          <div
+            className={cn(
+              'app-gutter flex-1 pt-4',
+              // Clears the mobile tab bar (h-16 plus the home-indicator inset);
+              // from md the tray is gone and the normal bottom padding applies.
+              'pb-[calc(4rem+env(safe-area-inset-bottom)+1.5rem)] md:pb-10',
+              isWide ? 'app-canvas' : 'app-column'
+            )}
+          >
+            {children}
+          </div>
+        </SidebarInset>
 
-      <SwipeToToggleSidebar />
+        <SwipeToToggleSidebar />
 
-      {/* Mounted here rather than inside /flares so it survives whichever
-          authenticated page a new user lands on first. */}
-      <OnboardingWalkthrough />
-    </SidebarProvider>
-  )
-}
+        {/* Primary navigation below md. The sidebar sheet keeps the secondary
+            items; these four are the ones worth a permanent thumb-reach slot. */}
+        <MobileTabBar />
 
-/** iFLARE wordmark + brand mark, top-left on every viewport. */
-function Brand() {
-  return (
-    <Link href="/flares" className="flex items-center gap-2" aria-label="iFLARE home">
-      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-orange-600">
-        <Radar className="h-5 w-5 text-white" strokeWidth={2} />
-      </span>
-      <span className="text-lg font-bold tracking-tight">
-        <span className="text-slate-400">i</span>
-        <span className="text-orange-500">FLARE</span>
-      </span>
-    </Link>
+        {/* Mounted here rather than inside /flares so it survives whichever
+            authenticated page a new user lands on first. */}
+        <OnboardingWalkthrough />
+      </SidebarProvider>
+    </AppChromeProvider>
   )
 }
 
 /**
- * Menu ⇄ close button for the mobile sidebar.
+ * The "open menu" button for the mobile sidebar.
  *
- * Fixed rather than laid out in the header for one reason: the sheet in
- * components/ui/sidebar.jsx hides its own close button (`[&>button]:hidden`),
- * so once the sidebar is open there is no other way out but the overlay. This
- * button sits above the overlay (z-[60]) and turns into an X, giving the open
- * state an unmistakable close control in the place the user just tapped.
+ * It only ever opens. It used to toggle, morphing into an X once the sheet was
+ * open — but that X could never work: a modal Radix sheet sets
+ * `pointer-events: none` on <body> and restores it only on the portalled layer,
+ * and this button renders in the normal tree, outside the portal. It painted
+ * above the overlay and was not a hit target, and because it sits within the
+ * 288px the sheet occupies, the click landed on the sheet content rather than
+ * counting as an outside-dismiss. Closing is now the sheet's own close button
+ * (components/ui/sheet.jsx), which is inside the portal.
+ *
+ * Unmounting while open also keeps it from covering that close button.
  */
 function MobileSidebarToggle() {
   const { openMobile, toggleSidebar } = useSidebar()
+
+  if (openMobile) return null
 
   return (
     <button
       type="button"
       onClick={toggleSidebar}
-      aria-label={openMobile ? 'Close menu' : 'Open menu'}
-      aria-expanded={openMobile}
-      className="fixed left-3 top-2.5 z-[60] flex h-11 w-11 items-center justify-center rounded-xl border border-slate-700 bg-slate-900 text-white shadow-lg shadow-black/40 transition-transform active:scale-95 md:hidden"
+      aria-label="Open menu"
+      aria-expanded={false}
+      className="fixed left-3 top-2.5 z-[60] flex h-11 w-11 items-center justify-center rounded-xl border border-line bg-surface-2 text-ink shadow-e3 hover:border-line-strong hover:bg-surface-3 active:scale-95 md:hidden"
     >
-      <span className="relative block h-5 w-5">
-        <Menu
-          className={`absolute inset-0 h-5 w-5 transition-all duration-200 ${
-            openMobile ? 'rotate-90 scale-50 opacity-0' : 'rotate-0 scale-100 opacity-100'
-          }`}
-        />
-        <X
-          className={`absolute inset-0 h-5 w-5 transition-all duration-200 ${
-            openMobile ? 'rotate-0 scale-100 opacity-100' : '-rotate-90 scale-50 opacity-0'
-          }`}
-        />
-      </span>
+      <Menu className="h-5 w-5" />
     </button>
   )
 }

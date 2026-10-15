@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useRef } from 'react'
+import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
@@ -10,22 +11,23 @@ import {
   CollapsibleTrigger,
 } from '@/components/ui/collapsible'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import ConfirmDialog from '@/components/ConfirmDialog'
 import StepProgress from '@/components/StepProgress'
+import FormBanner from '@/components/FormBanner'
 import InterestChip from '@/components/InterestChip'
 import InterestSelector from '@/components/InterestSelector'
 import { useEnterSubmit } from '@/hooks/useEnterSubmit'
 import {
   ArrowRight,
   ArrowLeft,
+  AlertCircle,
   CalendarDays,
   Check,
   ChevronDown,
   Clock,
   Loader2,
   Search,
-  MapPin,
   Users,
-  AlertCircle,
 } from 'lucide-react'
 import { resolveInterest } from '@/lib/interests'
 import { useInterestCatalog } from '@/lib/useInterestCatalog'
@@ -69,8 +71,14 @@ const dateValueIn = (days) => {
   return toDateValue(d)
 }
 
+// Which field an invalid step should send the user to, in the order they read.
+const STEP_FIELDS = {
+  1: ['title', 'description', 'interests'],
+  2: ['time', 'location'],
+}
+
 /**
- * Create-iFlare flow, previously a modal inside app/(app)/flares/page.js.
+ * Create-flare flow, previously a modal inside app/(app)/flares/page.js.
  *
  * Now an inline mode on the flares page (spec: a Join | Create switch rather
  * than a floating button), still two steps, still posting exactly the same
@@ -95,6 +103,19 @@ export default function CreateFlareForm({ currentUser, onCreated, onCancel }) {
   const [locationQuery, setLocationQuery] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState('')
+  // Per-field messages. The primary button used to be `disabled` under exactly
+  // the conditions the error branches tested, so the branches were unreachable
+  // and a grey button was the only signal about what was missing.
+  const [fieldErrors, setFieldErrors] = useState({})
+  const [confirmCancel, setConfirmCancel] = useState(false)
+
+  const fieldRefs = {
+    title: useRef(null),
+    description: useRef(null),
+    interests: useRef(null),
+    time: useRef(null),
+    location: useRef(null),
+  }
 
   // Needed outside the popover too: the chips that stay on screen once it
   // closes have to resolve a custom interest's real name, not its slug.
@@ -112,10 +133,21 @@ export default function CreateFlareForm({ currentUser, onCreated, onCancel }) {
     )
   }, [locationQuery])
 
-  const setInterests = (next) => {
+  /** Editing a field clears its own message, so fixing one thing doesn't leave
+      the complaint about it on screen until the next submit. */
+  const patch = (changes, clearedFields = []) => {
     setError('')
-    setFormData((prev) => ({ ...prev, interests: next }))
+    if (clearedFields.length) {
+      setFieldErrors((prev) => {
+        const next = { ...prev }
+        clearedFields.forEach((f) => delete next[f])
+        return next
+      })
+    }
+    setFormData((prev) => ({ ...prev, ...changes }))
   }
+
+  const setInterests = (next) => patch({ interests: next }, ['interests'])
 
   const removeInterest = (interest) =>
     setInterests(formData.interests.filter((id) => id !== interest.id))
@@ -124,8 +156,7 @@ export default function CreateFlareForm({ currentUser, onCreated, onCancel }) {
   const startIn = (minutes) => {
     const at = new Date(Date.now() + minutes * 60000)
     at.setMinutes(Math.ceil(at.getMinutes() / 5) * 5, 0, 0)
-    setError('')
-    setFormData((prev) => ({ ...prev, date: toDateValue(at), time: toTimeValue(at) }))
+    patch({ date: toDateValue(at), time: toTimeValue(at) }, ['time'])
   }
 
   // Enter advances the step; the hook skips the description textarea and the
@@ -133,34 +164,47 @@ export default function CreateFlareForm({ currentUser, onCreated, onCancel }) {
   const detailsStepKeyDown = useEnterSubmit(() => handleContinue())
   const whenWhereStepKeyDown = useEnterSubmit(() => handleCreate())
 
-  const step1Valid =
-    formData.title.trim() && formData.description.trim() && formData.interests.length > 0
-  const step2Valid = formData.location.name && formData.time
+  const isDirty =
+    formData.title.trim() ||
+    formData.description.trim() ||
+    formData.interests.length > 0 ||
+    formData.location.name ||
+    formData.time
+
+  /** Reports every problem on the step at once, then sends focus to the first. */
+  const reportErrors = (errors) => {
+    setFieldErrors(errors)
+    const first = STEP_FIELDS[step].find((f) => errors[f])
+    fieldRefs[first]?.current?.focus()
+    return Object.keys(errors).length === 0
+  }
 
   const handleContinue = () => {
-    if (!formData.title.trim() || !formData.description.trim()) {
-      setError('Add a title and a short description')
-      return
+    const errors = {}
+    if (!formData.title.trim()) errors.title = 'Say what you’re doing — this is the headline.'
+    if (!formData.description.trim()) {
+      errors.description = 'Add a line so people know what they’re joining.'
     }
     if (formData.interests.length === 0) {
-      setError('Pick at least one interest so the right people see this')
-      return
+      errors.interests = 'Pick at least one interest so the right people see this.'
     }
+    if (!reportErrors(errors)) return
     setError('')
     setStep(2)
   }
 
   const handleCreate = async () => {
-    if (!step2Valid) {
-      setError('Pick a venue and a start time')
-      return
-    }
+    const errors = {}
+    if (!formData.time) errors.time = 'Pick a start time.'
+    if (!formData.location.name) errors.location = 'Pick a venue.'
 
+    // Only meaningful once both halves exist, so it goes after the two checks
+    // above rather than replacing them.
     const startTime = new Date(`${formData.date}T${formData.time}`)
-    if (isNaN(startTime.getTime())) {
-      setError('That start time doesn&apos;t look right')
-      return
+    if (!errors.time && isNaN(startTime.getTime())) {
+      errors.time = 'That start time doesn’t look right.'
     }
+    if (!reportErrors(errors)) return
 
     setIsSubmitting(true)
     setError('')
@@ -187,12 +231,17 @@ export default function CreateFlareForm({ currentUser, onCreated, onCancel }) {
 
       if (response.ok) {
         const savedFlare = await response.json()
+        // The page routes to /activity from onCreated, so without this the
+        // flow ends on a different screen with nothing confirming it worked.
+        toast.success(`${savedFlare.title || 'Your flare'} is live`, {
+          description: `${formData.location.name} · we'll show it to your campus.`,
+        })
         onCreated(savedFlare)
         return
       }
 
       const data = await response.json().catch(() => ({}))
-      setError(data.error || 'Failed to create iFlare')
+      setError(data.error || 'Failed to create flare')
       setIsSubmitting(false)
     } catch (err) {
       console.error('Error creating flare:', err)
@@ -201,24 +250,28 @@ export default function CreateFlareForm({ currentUser, onCreated, onCancel }) {
     }
   }
 
+  /** Cancel discards a filled two-step form, so it asks first. */
+  const handleCancel = () => {
+    if (isDirty) {
+      setConfirmCancel(true)
+      return
+    }
+    onCancel()
+  }
+
   return (
     <div>
       <StepProgress steps={STEPS} currentStep={step} />
 
-      {error && (
-        <div className="mb-4 flex items-start gap-2 rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-400">
-          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-          <span>{error}</span>
-        </div>
-      )}
+      <FormBanner tone="error">{error}</FormBanner>
 
       {/* ---------------- Step 1: Details ---------------- */}
       {step === 1 && (
-        <div onKeyDown={detailsStepKeyDown}>
+        <div key="step-1" className="animate-fade-in-up" onKeyDown={detailsStepKeyDown}>
           {/* Collapsed by default: six title suggestions are helpful once and
               then only push Continue below the fold on a phone. */}
           <Collapsible open={ideasOpen} onOpenChange={setIdeasOpen} className="mb-4">
-            <CollapsibleTrigger className="flex w-full items-center justify-between rounded-xl border border-orange-500/20 bg-orange-500/10 px-4 py-2.5 text-sm font-medium text-orange-400 transition-colors hover:bg-orange-500/15">
+            <CollapsibleTrigger className="flex w-full items-center justify-between rounded-xl border border-brand-500/20 bg-brand-500/10 px-4 py-2.5 text-sm font-medium text-brand-300 hover:bg-brand-500/15">
               <span>💡 Need an idea?</span>
               <ChevronDown
                 className={`h-4 w-4 transition-transform ${ideasOpen ? 'rotate-180' : ''}`}
@@ -231,10 +284,10 @@ export default function CreateFlareForm({ currentUser, onCreated, onCancel }) {
                     key={idea}
                     type="button"
                     onClick={() => {
-                      setFormData({ ...formData, title: idea })
+                      patch({ title: idea }, ['title'])
                       setIdeasOpen(false)
                     }}
-                    className="rounded-lg bg-slate-800/50 px-3 py-1.5 text-xs text-slate-300 transition-colors hover:bg-slate-700/50"
+                    className="rounded-lg bg-surface-2 px-3 py-1.5 text-xs text-ink-muted hover:bg-surface-3 hover:text-ink"
                   >
                     {idea}
                   </button>
@@ -245,35 +298,45 @@ export default function CreateFlareForm({ currentUser, onCreated, onCancel }) {
 
           <div className="space-y-4">
             <div>
-              <label htmlFor="flare-title" className="mb-2 block text-sm text-slate-400">
+              <label htmlFor="flare-title" className="mb-2 block text-sm text-ink-muted">
                 What are you doing?
               </label>
               <Input
                 id="flare-title"
+                ref={fieldRefs.title}
                 value={formData.title}
-                onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                onChange={(e) => patch({ title: e.target.value }, ['title'])}
                 placeholder="e.g. Looking for a gym buddy"
-                className="h-12 rounded-xl border-slate-700 bg-slate-800/50 text-white placeholder:text-slate-500 focus:border-orange-500"
+                aria-invalid={Boolean(fieldErrors.title)}
+                aria-describedby={fieldErrors.title ? 'flare-title-error' : undefined}
+                className={`h-12 ${fieldErrors.title ? 'border-danger focus:border-danger' : ''}`}
               />
+              <FieldError id="flare-title-error">{fieldErrors.title}</FieldError>
             </div>
 
             <div>
-              <label htmlFor="flare-desc" className="mb-2 block text-sm text-slate-400">
+              <label htmlFor="flare-desc" className="mb-2 block text-sm text-ink-muted">
                 Tell people more
               </label>
               {/* Textarea: Enter inserts a newline, never submits. */}
               <Textarea
                 id="flare-desc"
+                ref={fieldRefs.description}
                 value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                onChange={(e) => patch({ description: e.target.value }, ['description'])}
                 rows={2}
                 placeholder="Skill level, what to bring, how long you'll be there..."
-                className="resize-y rounded-xl border-slate-700 bg-slate-800/50 text-white placeholder:text-slate-500 focus:border-orange-500"
+                aria-invalid={Boolean(fieldErrors.description)}
+                aria-describedby={fieldErrors.description ? 'flare-desc-error' : undefined}
+                className={`resize-y ${
+                  fieldErrors.description ? 'border-danger focus:border-danger' : ''
+                }`}
               />
+              <FieldError id="flare-desc-error">{fieldErrors.description}</FieldError>
             </div>
 
             <div>
-              <label className="mb-2 block text-sm text-slate-400">
+              <label className="mb-2 block text-sm text-ink-muted">
                 How many people can join?
               </label>
               <div className="flex flex-wrap gap-2">
@@ -283,12 +346,12 @@ export default function CreateFlareForm({ currentUser, onCreated, onCancel }) {
                     <button
                       key={n}
                       type="button"
-                      onClick={() => setFormData({ ...formData, maxAttendees: n })}
+                      onClick={() => patch({ maxAttendees: n })}
                       aria-pressed={selected}
-                      className={`flex h-11 w-11 items-center justify-center rounded-xl border text-sm font-semibold transition-colors ${
+                      className={`tabular flex h-11 w-11 items-center justify-center rounded-xl border text-sm font-semibold ${
                         selected
-                          ? 'border-orange-500 bg-orange-500/15 text-orange-300'
-                          : 'border-slate-700 bg-slate-800/40 text-slate-400 hover:bg-slate-800/70'
+                          ? 'border-brand-500 bg-brand-500/15 text-brand-300 hover:bg-brand-500/25'
+                          : 'border-line bg-surface-2 text-ink-muted hover:bg-surface-3 hover:text-ink'
                       }`}
                     >
                       {n}
@@ -296,7 +359,7 @@ export default function CreateFlareForm({ currentUser, onCreated, onCancel }) {
                   )
                 })}
               </div>
-              <p className="mt-2 flex items-center gap-1.5 text-xs text-slate-500">
+              <p className="mt-2 flex items-center gap-1.5 text-xs text-ink-subtle">
                 <Users className="h-3 w-3" />
                 Counting you — {formData.maxAttendees - 1} other
                 {formData.maxAttendees - 1 === 1 ? '' : 's'} can join.
@@ -304,7 +367,7 @@ export default function CreateFlareForm({ currentUser, onCreated, onCancel }) {
             </div>
 
             <div>
-              <label className="mb-2 block text-sm text-slate-400">
+              <label id="flare-interests-label" className="mb-2 block text-sm text-ink-muted">
                 Who should see this?
               </label>
 
@@ -315,23 +378,31 @@ export default function CreateFlareForm({ currentUser, onCreated, onCancel }) {
               <Popover open={interestsOpen} onOpenChange={setInterestsOpen}>
                 <PopoverTrigger asChild>
                   <button
+                    ref={fieldRefs.interests}
                     type="button"
-                    className="flex h-12 w-full items-center justify-between rounded-xl border border-slate-700 bg-slate-800/50 px-4 text-sm text-slate-300 transition-colors hover:bg-slate-800/70"
+                    aria-labelledby="flare-interests-label"
+                    aria-invalid={Boolean(fieldErrors.interests)}
+                    aria-describedby={
+                      fieldErrors.interests ? 'flare-interests-error' : undefined
+                    }
+                    className={`flex h-12 w-full items-center justify-between rounded-lg border bg-surface-3 px-4 text-sm text-ink-muted shadow-e1 hover:bg-surface-2 ${
+                      fieldErrors.interests ? 'border-danger' : 'border-line'
+                    }`}
                   >
                     <span className="flex items-center gap-2">
-                      <Search className="h-4 w-4 text-slate-500" />
+                      <Search className="h-4 w-4 text-ink-subtle" />
                       {formData.interests.length
                         ? `${formData.interests.length} interest${
                             formData.interests.length === 1 ? '' : 's'
                           } selected`
                         : 'Choose interests'}
                     </span>
-                    <ChevronDown className="h-4 w-4 text-slate-500" />
+                    <ChevronDown className="h-4 w-4 text-ink-subtle" />
                   </button>
                 </PopoverTrigger>
                 <PopoverContent
                   align="start"
-                  className="w-[min(22rem,calc(100vw-2rem))] rounded-xl border-slate-700 bg-slate-900 p-3"
+                  className="w-[min(22rem,calc(100vw-2rem))] rounded-xl border-line-subtle bg-surface-2 p-3 shadow-e3"
                 >
                   <InterestSelector
                     value={formData.interests}
@@ -359,29 +430,24 @@ export default function CreateFlareForm({ currentUser, onCreated, onCancel }) {
                 </div>
               )}
 
-              <p className="mt-2 text-xs text-slate-500">
-                Only students at your university will see this flare.
-              </p>
+              {fieldErrors.interests ? (
+                <FieldError id="flare-interests-error">{fieldErrors.interests}</FieldError>
+              ) : (
+                <p className="mt-2 text-xs text-ink-subtle">
+                  Only students at your university will see this flare.
+                </p>
+              )}
             </div>
           </div>
 
-          <div className="mt-4 flex gap-3">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={onCancel}
-              className="h-14 rounded-2xl border-slate-700 bg-transparent px-6 text-slate-300 hover:bg-slate-800/60 hover:text-white"
-            >
+          <div className="mt-6 flex gap-3">
+            <Button type="button" variant="outline" size="lg" onClick={handleCancel}>
               Cancel
             </Button>
-            <Button
-              type="button"
-              onClick={handleContinue}
-              disabled={!step1Valid}
-              className="h-14 flex-1 rounded-2xl bg-orange-600 text-lg font-semibold text-white hover:bg-orange-700 disabled:opacity-50"
-            >
+            {/* Not disabled on purpose — see fieldErrors above. */}
+            <Button type="button" size="lg" className="flex-1" onClick={handleContinue}>
               Continue
-              <ArrowRight className="ml-2 h-5 w-5" />
+              <ArrowRight className="h-5 w-5" />
             </Button>
           </div>
         </div>
@@ -389,16 +455,18 @@ export default function CreateFlareForm({ currentUser, onCreated, onCancel }) {
 
       {/* ---------------- Step 2: When & where ---------------- */}
       {step === 2 && (
-        <div onKeyDown={whenWhereStepKeyDown}>
+        <div key="step-2" className="animate-fade-in-up" onKeyDown={whenWhereStepKeyDown}>
           <div className="space-y-5">
             <div>
-              <label className="mb-2 block text-sm text-slate-400">When does it start?</label>
+              <label htmlFor="flare-time" className="mb-2 block text-sm text-ink-muted">
+                When does it start?
+              </label>
 
               {/* Time before date: a spontaneous meetup is decided as "in an
                   hour" or "at 9", and the day is almost always today — so the
                   field people actually have to think about comes first. */}
-              <div className="rounded-xl border border-slate-700 bg-slate-800/40 p-3">
-                <p className="mb-2 flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-slate-500">
+              <div className="rounded-xl border border-line-subtle bg-surface-1 p-3">
+                <p className="mb-2 flex items-center gap-1.5 text-2xs font-medium uppercase tracking-wide text-ink-subtle">
                   <Clock className="h-3.5 w-3.5" />
                   Time
                 </p>
@@ -408,23 +476,28 @@ export default function CreateFlareForm({ currentUser, onCreated, onCancel }) {
                       key={offset.minutes}
                       type="button"
                       onClick={() => startIn(offset.minutes)}
-                      className="rounded-full border border-slate-700 bg-slate-800/60 px-3.5 py-1.5 text-sm font-medium text-slate-300 transition-colors hover:border-orange-500/60 hover:bg-orange-500/10 hover:text-orange-200"
+                      className="rounded-full border border-line bg-surface-2 px-3.5 py-1.5 text-sm font-medium text-ink-muted hover:border-brand-500/60 hover:bg-brand-500/10 hover:text-brand-300"
                     >
                       {offset.label}
                     </button>
                   ))}
                 </div>
                 <Input
+                  id="flare-time"
+                  ref={fieldRefs.time}
                   type="time"
                   value={formData.time}
-                  onChange={(e) => setFormData({ ...formData, time: e.target.value })}
-                  aria-label="Start time"
-                  className="mt-3 h-12 w-full rounded-xl border-slate-700 bg-slate-900/60 text-white focus:border-orange-500"
+                  onChange={(e) => patch({ time: e.target.value }, ['time'])}
+                  aria-invalid={Boolean(fieldErrors.time)}
+                  aria-describedby={fieldErrors.time ? 'flare-time-error' : undefined}
+                  className={`tabular mt-3 h-12 w-full ${
+                    fieldErrors.time ? 'border-danger focus:border-danger' : ''
+                  }`}
                 />
               </div>
 
-              <div className="mt-3 rounded-xl border border-slate-700 bg-slate-800/40 p-3">
-                <p className="mb-2 flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-slate-500">
+              <div className="mt-3 rounded-xl border border-line-subtle bg-surface-1 p-3">
+                <p className="mb-2 flex items-center gap-1.5 text-2xs font-medium uppercase tracking-wide text-ink-subtle">
                   <CalendarDays className="h-3.5 w-3.5" />
                   Date
                 </p>
@@ -438,12 +511,12 @@ export default function CreateFlareForm({ currentUser, onCreated, onCancel }) {
                       <button
                         key={choice.label}
                         type="button"
-                        onClick={() => setFormData({ ...formData, date: choice.value })}
+                        onClick={() => patch({ date: choice.value }, ['time'])}
                         aria-pressed={selected}
-                        className={`rounded-full border px-3.5 py-1.5 text-sm font-medium transition-colors ${
+                        className={`rounded-full border px-3.5 py-1.5 text-sm font-medium ${
                           selected
-                            ? 'border-orange-500/60 bg-orange-500/15 text-orange-200'
-                            : 'border-slate-700 bg-slate-800/60 text-slate-300 hover:bg-slate-800'
+                            ? 'border-brand-500/60 bg-brand-500/15 text-brand-300 hover:bg-brand-500/25'
+                            : 'border-line bg-surface-2 text-ink-muted hover:bg-surface-3 hover:text-ink'
                         }`}
                       >
                         {choice.label}
@@ -455,49 +528,58 @@ export default function CreateFlareForm({ currentUser, onCreated, onCancel }) {
                   type="date"
                   value={formData.date}
                   min={todayValue()}
-                  onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+                  onChange={(e) => patch({ date: e.target.value }, ['time'])}
                   aria-label="Start date"
-                  className="mt-3 h-12 w-full rounded-xl border-slate-700 bg-slate-900/60 text-white focus:border-orange-500"
+                  className="tabular mt-3 h-12 w-full"
                 />
               </div>
+
+              <FieldError id="flare-time-error">{fieldErrors.time}</FieldError>
 
               {/* Make the consequence of the chosen time immediately legible. */}
               <StartTimePreview date={formData.date} time={formData.time} />
             </div>
 
             <div>
-              <label className="mb-2 block text-sm text-slate-400">Where?</label>
+              <label htmlFor="flare-venue-search" className="mb-2 block text-sm text-ink-muted">
+                Where?
+              </label>
               <div className="relative mb-3">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-subtle" />
                 <Input
+                  id="flare-venue-search"
+                  ref={fieldRefs.location}
                   value={locationQuery}
                   onChange={(e) => setLocationQuery(e.target.value)}
                   placeholder="Search campus venues"
-                  aria-label="Search campus venues"
-                  className="h-11 rounded-xl border-slate-700 bg-slate-800/50 pl-9 text-white placeholder:text-slate-500 focus:border-orange-500"
+                  aria-invalid={Boolean(fieldErrors.location)}
+                  aria-describedby={fieldErrors.location ? 'flare-venue-error' : undefined}
+                  className={`pl-9 ${
+                    fieldErrors.location ? 'border-danger focus:border-danger' : ''
+                  }`}
                 />
               </div>
+
+              <FieldError id="flare-venue-error">{fieldErrors.location}</FieldError>
 
               <div className="max-h-72 space-y-4 overflow-y-auto pr-1">
                 {visibleLocations ? (
                   <VenueList
                     venues={visibleLocations}
                     selectedName={formData.location.name}
-                    onSelect={(venue) =>
-                      setFormData({ ...formData, location: toLocationValue(venue) })
-                    }
+                    onSelect={(venue) => patch({ location: toLocationValue(venue) }, ['location'])}
                   />
                 ) : (
                   LOCATION_GROUPS.map((group) => (
                     <div key={group}>
-                      <p className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-500">
+                      <p className="mb-2 text-2xs font-medium uppercase tracking-wide text-ink-subtle">
                         {group}
                       </p>
                       <VenueList
                         venues={CAMPUS_LOCATIONS.filter((l) => l.group === group)}
                         selectedName={formData.location.name}
                         onSelect={(venue) =>
-                          setFormData({ ...formData, location: toLocationValue(venue) })
+                          patch({ location: toLocationValue(venue) }, ['location'])
                         }
                       />
                     </div>
@@ -505,7 +587,7 @@ export default function CreateFlareForm({ currentUser, onCreated, onCancel }) {
                 )}
 
                 {visibleLocations?.length === 0 && (
-                  <p className="py-2 text-sm text-slate-500">
+                  <p className="py-2 text-sm text-ink-subtle">
                     No venue matches &ldquo;{locationQuery}&rdquo;.
                   </p>
                 )}
@@ -517,33 +599,58 @@ export default function CreateFlareForm({ currentUser, onCreated, onCancel }) {
             <Button
               type="button"
               variant="outline"
+              size="lg"
+              aria-label="Back to details"
               onClick={() => {
                 setError('')
+                setFieldErrors({})
                 setStep(1)
               }}
-              className="h-14 rounded-2xl border-slate-700 bg-transparent px-6 text-slate-300 hover:bg-slate-800/60 hover:text-white"
             >
               <ArrowLeft className="h-5 w-5" />
             </Button>
             <Button
               type="button"
+              size="lg"
+              className="flex-1"
               onClick={handleCreate}
-              disabled={!step2Valid || isSubmitting}
-              className="h-14 flex-1 rounded-2xl bg-orange-600 text-lg font-semibold text-white hover:bg-orange-700 disabled:opacity-50"
+              disabled={isSubmitting}
             >
               {isSubmitting ? (
-                <span className="flex items-center gap-2">
+                <>
                   <Loader2 className="h-5 w-5 animate-spin" />
                   Creating...
-                </span>
+                </>
               ) : (
-                'Create iFlare'
+                'Create flare'
               )}
             </Button>
           </div>
         </div>
       )}
+
+      {/* Cancel used to discard a filled two-step form silently. */}
+      <ConfirmDialog
+        open={confirmCancel}
+        onOpenChange={setConfirmCancel}
+        title="Discard this flare?"
+        description="What you've filled in so far won't be saved."
+        confirmLabel="Discard"
+        cancelLabel="Keep editing"
+        onConfirm={onCancel}
+      />
     </div>
+  )
+}
+
+/** One field's message. Sits in the same slot as the field's hint text. */
+function FieldError({ id, children }) {
+  if (!children) return null
+  return (
+    <p id={id} className="mt-2 flex items-start gap-1.5 text-xs text-danger">
+      <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+      <span>{children}</span>
+    </p>
   )
 }
 
@@ -558,21 +665,21 @@ function VenueList({ venues, selectedName, onSelect }) {
             type="button"
             onClick={() => onSelect(venue)}
             aria-pressed={selected}
-            className={`flex items-center gap-2 rounded-xl border px-3 py-2.5 text-left transition-colors ${
+            className={`flex items-center gap-2 rounded-xl border px-3 py-2.5 text-left ${
               selected
-                ? 'border-orange-500 bg-orange-500/10'
-                : 'border-slate-700 bg-slate-800/40 hover:bg-slate-800/70'
+                ? 'border-brand-500 bg-brand-500/10 hover:bg-brand-500/20'
+                : 'border-line-subtle bg-surface-2 hover:bg-surface-3'
             }`}
           >
             <span className="text-base">{venue.emoji}</span>
             <span
               className={`min-w-0 flex-1 truncate text-sm ${
-                selected ? 'font-medium text-white' : 'text-slate-300'
+                selected ? 'font-medium text-ink' : 'text-ink-muted'
               }`}
             >
               {venue.name}
             </span>
-            {selected && <Check className="h-4 w-4 shrink-0 text-orange-400" />}
+            {selected && <Check className="h-4 w-4 shrink-0 text-brand-400" />}
           </button>
         )
       })}
@@ -584,10 +691,7 @@ function VenueList({ venues, selectedName, onSelect }) {
 function StartTimePreview({ date, time }) {
   if (!date || !time) {
     return (
-      <p className="mt-2 flex items-center gap-1.5 text-xs text-slate-500">
-        <MapPin className="h-3 w-3 opacity-0" />
-        Pick a time to see when this goes live.
-      </p>
+      <p className="mt-2 text-xs text-ink-subtle">Pick a time to see when this goes live.</p>
     )
   }
 
@@ -597,13 +701,13 @@ function StartTimePreview({ date, time }) {
   const diffMins = Math.round((start.getTime() - Date.now()) / 60000)
 
   let message
-  let tone = 'text-slate-400'
+  let tone = 'text-ink-muted'
   if (diffMins < 0) {
     message = 'That time has already passed.'
-    tone = 'text-red-400'
+    tone = 'text-danger'
   } else if (diffMins < 90) {
     message = `Starts in ${diffMins} min — it'll show on the feed straight away.`
-    tone = 'text-orange-300'
+    tone = 'text-brand-300'
   } else {
     const hours = Math.floor(diffMins / 60)
     const mins = diffMins % 60

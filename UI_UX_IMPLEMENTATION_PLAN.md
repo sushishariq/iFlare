@@ -1,5 +1,11 @@
 # iFLARE UI/UX Implementation Plan
 
+> **⚠️ Superseded for new work.** Phases 1–5 below are complete and still describe how the current
+> shell, interest system and wizards got here — keep them for reference. Phase 6 was never started
+> and has been **absorbed into Phase F** of
+> [`VISUAL_OVERHAUL_PLAN.md`](./VISUAL_OVERHAUL_PLAN.md), which is the active plan. Do not run
+> Phase 6 from this file; start from the other one.
+
 **This file is the persistent source of truth for the UI/UX overhaul.** It survives context
 resets. At the start of any new session, read [`CLAUDE.md`](./CLAUDE.md) and then this file before
 touching anything.
@@ -76,7 +82,7 @@ single reusable interest component backed by persistable custom interests.
 | **3** | Shared interest chip/selector + custom-interest persistence | **Yes** | 1 | ✅ **Complete** |
 | **4** | Registration → 4 steps | **Yes** | 3 | ✅ **Complete** |
 | **5** | Create-flare step 1 compaction + step 2 time/date | No | 3 | ✅ **Complete** |
-| **6** | Interest consistency audit + docs/cleanup | No | 3, 4, 5 | ⬜ Not started |
+| **6** | Interest consistency audit + docs/cleanup | No | 3, 4, 5 | ✅ **Done as Phase F** of `VISUAL_OVERHAUL_PLAN.md` |
 
 ---
 
@@ -157,13 +163,24 @@ University → Account → OTP → Personalisation.
 - **Step 2 reorders to Time → Date** with improved controls built from existing shadcn primitives.
   `StartTimePreview` and the posted payload are unchanged.
 
-### PHASE 6 — Audit + docs
+### PHASE 6 — Audit + docs ✅ DELIVERED AS PHASE F
 
-- Sweep `FlareSearch`, `FlareCard`, `FlareDetailModal`, `profile`, `activity` onto the shared chip.
-- Product terminology pass: "iFlare" → "flare" for individual meetups in user-facing copy.
-- Document that campus locations must become university-specific, in `lib/campusLocations.js` and
-  `CLAUDE.md`.
-- Refresh `DEVELOPMENT.md` with the `interests` collection and the two new endpoints.
+Every item below was completed in **Phase F of
+[`VISUAL_OVERHAUL_PLAN.md`](./VISUAL_OVERHAUL_PLAN.md)**, which absorbed this phase rather than
+running it separately. See that file's Phase F status entry for the full log; in summary:
+
+- ~~Sweep `FlareSearch`, `FlareCard`, `FlareDetailModal`, `profile`, `activity` onto the shared
+  chip.~~ Done across Phases D and F. `INTERESTS[].color` and `.tag` are **deleted** —
+  `components/InterestChip.js` is the only interest treatment, and `/profile` now renders the full
+  `InterestSelector` (it could not see or remove a custom interest before).
+- ~~Product terminology pass.~~ Done — zero occurrences of "iFlare" as a noun for a meetup remain in
+  `app/`, `components/` or `lib/`, verified in the rendered pages as well as the source.
+- ~~Document the university-specific-locations TODO.~~ Done in the `lib/campusLocations.js` file
+  header, `CLAUDE.md`'s file table, and `DEVELOPMENT.md § 12`.
+- ~~Refresh `DEVELOPMENT.md`.~~ Done — new § 5.4 for the `interests` collection and § 7.3 for
+  `GET`/`POST /interests`.
+- Also from this file's Phase 2 note: ~~delete the dead `notifyNewFlare` in
+  `lib/notifications.js`.~~ Deleted.
 
 ---
 

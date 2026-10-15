@@ -1,15 +1,26 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { createPortal } from 'react-dom'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import { toast } from 'sonner'
+import { AlertTriangle, Bell, Clock, Plus, Radar, RotateCw, Sparkles, Zap } from 'lucide-react'
+
 import { Button } from '@/components/ui/button'
-import { Radar, Plus, Clock, Sparkles, Bell, Zap } from 'lucide-react'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useNotificationContext } from '@/lib/NotificationProvider'
-import FlareCard from '@/components/FlareCard'
+import { useTopBarSlot } from '@/lib/AppChromeProvider'
+import { getFlareCapacity } from '@/lib/flareCapacity'
+import { getTimeInfo } from '@/lib/flareTime'
+import { fetchWithTimeout } from '@/lib/fetchWithTimeout'
+import { readStoredSession } from '@/lib/session'
+import FlareCard, { FlareCardSkeleton } from '@/components/FlareCard'
 import FlareDetailModal from '@/components/FlareDetailModal'
+import FlareDetailPanel from '@/components/FlareDetailPanel'
 import CreateFlareForm from '@/components/CreateFlareForm'
 import FlareSearch from '@/components/FlareSearch'
+import UnreadBadge from '@/components/UnreadBadge'
 
 // Default until the stored user loads from localStorage.
 const DEFAULT_USER = {
@@ -27,9 +38,20 @@ export default function FlaresPage() {
     unreadCount,
   } = useNotificationContext()
 
+  // The top bar's inline search slot, present only from md up. When it exists
+  // the search field is portalled into it; when it doesn't (mobile), the field
+  // renders in place. Either way there is exactly one FlareSearch instance, so
+  // the query and the suggestion panel never fork.
+  const topBarSlot = useTopBarSlot()
+
   const [currentUser, setCurrentUser] = useState(DEFAULT_USER)
   const [flares, setFlares] = useState([])
-  const [filteredFlares, setFilteredFlares] = useState([])
+  // Starts true, and that is the whole fix for the feed's worst bug: `flares`
+  // began as [] while the fetch waited on a *second* effect to read
+  // localStorage, so every user was told "No flares in the next 90 minutes"
+  // on every visit before their data had even been requested.
+  const [isLoading, setIsLoading] = useState(true)
+  const [loadError, setLoadError] = useState(null)
   const [activeFilter, setActiveFilter] = useState('all')
   const [searchQuery, setSearchQuery] = useState('')
   // 'join' (default) or 'create' — replaces the old floating-button modal.
@@ -39,81 +61,83 @@ export default function FlaresPage() {
 
   // Load user from localStorage
   useEffect(() => {
-    const storedUser = localStorage.getItem('iflare_user')
-    if (storedUser) {
-      try {
-        const userData = JSON.parse(storedUser)
-        setCurrentUser(userData)
-      } catch (e) {
-        console.error('Error parsing user data')
-      }
+    const { user: userData, ok } = readStoredSession()
+    if (!ok) {
+      // Nothing to fetch for — stop loading rather than leaving the skeletons
+      // spinning forever behind a session that doesn't exist.
+      setIsLoading(false)
+      return
     }
+    setCurrentUser(userData)
   }, [])
 
-  // If arriving from the Activity page with a specific flare to open,
-  // pick it up from sessionStorage and open its detail modal.
-  useEffect(() => {
-    if (typeof window === 'undefined') return
-    const raw = sessionStorage.getItem('iflare_open_flare')
-    if (!raw) return
+  // Fetch from the database (the API scopes the feed to the requesting user's
+  // university by email domain).
+  //
+  // `silent` is for the background refresh: it must not drop the feed the user
+  // is reading back to skeletons, and a failed refresh must not replace a
+  // perfectly good feed with an error screen.
+  const fetchFlares = useCallback(async ({ silent = false } = {}) => {
+    if (!currentUser.id) return
+
+    if (!silent) {
+      setIsLoading(true)
+      setLoadError(null)
+    }
+
     try {
-      const flareToOpen = JSON.parse(raw)
-      if (flareToOpen && flareToOpen.id) {
-        setFlares(prev =>
-          prev.some(f => f.id === flareToOpen.id) ? prev : [flareToOpen, ...prev]
-        )
-        setSelectedFlare(flareToOpen)
-      }
-    } catch (e) {
-      // ignore malformed payloads
+      const { token } = readStoredSession()
+      // Optional-chained: accounts created before the interests field exist, and
+      // the signup flow itself writes the user *before* step 4 adds interests.
+      const interests = (currentUser.interests || []).join(',')
+
+      const response = await fetchWithTimeout(
+        `/api/flares?interests=${interests}&userId=${encodeURIComponent(currentUser.id)}`,
+        { headers: { 'Authorization': `Bearer ${token}` } }
+      )
+
+      if (!response.ok) throw new Error(`Feed request failed (${response.status})`)
+
+      const dbFlares = await response.json()
+      setFlares(Array.isArray(dbFlares) ? dbFlares : [])
+      setLoadError(null)
+    } catch (err) {
+      // A failure used to become `setFlares([])`, so a 500 and a quiet campus
+      // rendered identically — the user was told there was nothing on, and
+      // given no way to find out otherwise.
+      console.error('Error fetching flares:', err)
+      if (!silent) setLoadError('We couldn’t load your campus feed.')
     } finally {
-      sessionStorage.removeItem('iflare_open_flare')
+      if (!silent) setIsLoading(false)
     }
-  }, [])
+  }, [currentUser.id, currentUser.interests])
 
-  // Initialize flares - fetch from database (scoped to user's university via API)
   useEffect(() => {
-    const fetchFlares = async () => {
-      try {
-        const token = localStorage.getItem('iflare_token')
-        const interests = currentUser.interests.join(',')
+    fetchFlares()
+  }, [fetchFlares])
 
-        // Fetch real flares from database - server scopes by requesting user's email domain
-        const response = await fetch(
-          `/api/flares?interests=${interests}&userId=${encodeURIComponent(currentUser.id || '')}`,
-          { headers: { 'Authorization': `Bearer ${token}` } }
-        )
-
-        if (response.ok) {
-          const dbFlares = await response.json()
-          setFlares(Array.isArray(dbFlares) ? dbFlares : [])
-        } else {
-          setFlares([])
-        }
-      } catch (err) {
-        console.error('Error fetching flares:', err)
-        setFlares([])
-      }
-    }
-
-    if (currentUser?.id) {
-      fetchFlares()
-    }
-  }, [currentUser.interests, currentUser.id])
-
-  // Update current time every minute for countdown
+  // The minute tick. It also refetches: flares appear 90 minutes before they
+  // start, so a feed left open used to go stale the moment another student
+  // posted one, and only a full page reload brought it back.
   useEffect(() => {
     const interval = setInterval(() => {
       setCurrentTime(new Date())
-    }, 60000) // Update every minute
+      fetchFlares({ silent: true })
+    }, 60000)
     return () => clearInterval(interval)
-  }, [])
+  }, [fetchFlares])
 
   // Filter and sort flares based on:
   // 1. Visibility window: 90 min before start → 30 min after start
   // 2. User interests match
   // 3. Sorted by start time
-  useEffect(() => {
+  //
+  // Derived, not state written by an effect. As state it was always one render
+  // behind `flares`: the render in which the fetch resolved still had the
+  // previous (on first load, empty) filtered list, and anything reading both in
+  // the same pass — the ?flare= deep link below does exactly that — saw a feed
+  // that had loaded and a filtered list that had not.
+  const filteredFlares = useMemo(() => {
     const nowMs = currentTime.getTime()
     const windowStart = nowMs - 30 * 60 * 1000  // events that started up to 30 min ago
     const windowEnd = nowMs + 90 * 60 * 1000    // events starting within the next 90 min
@@ -124,7 +148,10 @@ export default function FlaresPage() {
       // Inside the visibility window?
       if (startMs <= windowStart || startMs > windowEnd) return false
       // Interest match?
-      return flare.interests?.some(interest => currentUser.interests.includes(interest))
+      // Both sides optional-chained: a user document written before the
+      // interests field existed threw here during render, and only once the
+      // feed had data — so it presented as "spinner, then blank page".
+      return flare.interests?.some(interest => currentUser.interests?.includes(interest))
     })
 
     // Apply interest filter if not 'all'
@@ -147,52 +174,63 @@ export default function FlaresPage() {
       return timeA - timeB
     })
 
-    setFilteredFlares(filtered)
+    return filtered
   }, [flares, activeFilter, searchQuery, currentTime, currentUser.interests])
 
-  // Get time remaining/elapsed and urgency level.
-  // - Positive diff: "in X min" (Starting Soon)
-  // - Non-positive diff: "started X min ago" (Happening Now, up to 30 min old)
-  const getTimeInfo = (startTime) => {
-    const now = new Date()
-    const start = new Date(startTime)
-    const diffMs = start - now
-    const diffMins = Math.floor(diffMs / (1000 * 60))
+  // Keep the open flare in step with the feed.
+  //
+  // A flare that leaves the feed (its window closed, or a filter excluded it)
+  // must not stay open in the desktop pane, which sits beside a feed that no
+  // longer contains it. One that is still there but has been refreshed — a new
+  // attendee arrived in the 60s refetch — swaps in, so the pane's attendee list
+  // and Join CTA don't go stale while it's on screen. The identity check is
+  // what stops that second branch looping: `filteredFlares` is a new array on
+  // every clock tick, but its elements are the same objects until `flares`
+  // actually changes.
+  useEffect(() => {
+    if (!selectedFlare) return
+    const live = filteredFlares.find(f => f.id === selectedFlare.id)
+    if (!live) setSelectedFlare(null)
+    else if (live !== selectedFlare) setSelectedFlare(live)
+  }, [filteredFlares, selectedFlare])
 
-    if (diffMins > 0) {
-      if (diffMins <= 15) return { text: `${diffMins} min`, urgency: 'critical', mins: diffMins }
-      if (diffMins <= 30) return { text: `${diffMins} min`, urgency: 'high', mins: diffMins }
-      if (diffMins <= 60) return { text: `${diffMins} min`, urgency: 'medium', mins: diffMins }
-      return { text: `${diffMins} min`, urgency: 'normal', mins: diffMins }
-    }
-    // Started already — Happening Now if within 30 min buffer, otherwise Ended.
-    const ago = -diffMins
-    if (ago <= 30) {
-      return {
-        text: ago === 0 ? 'Just started' : `Started ${ago} min ago`,
-        urgency: 'happening',
-        mins: diffMins,
-      }
-    }
-    return { text: 'Ended', urgency: 'ended', mins: diffMins }
-  }
+  // Open the flare a notification pointed at.
+  //
+  // Notification rows used to be dead ends: you were told a flare matched your
+  // interests and then left on a list with no way to reach it. They link to
+  // `/flares?flare=<id>` now, and this is the other half — it waits for the
+  // feed rather than racing it, says so when the flare is no longer on the
+  // feed (which is a real outcome: the window is 90 minutes), and strips the
+  // parameter either way so a later reload doesn't reopen it.
+  //
+  // `location.search` rather than `useSearchParams`, for the reason Phase E
+  // recorded: that hook forces the route under a Suspense boundary whose
+  // fallback would flash on every cold load of the app's main screen.
+  useEffect(() => {
+    if (isLoading || loadError || !currentUser.id) return
 
-  const getUrgencyStyles = (urgency) => {
-    switch (urgency) {
-      case 'critical':
-        return 'bg-red-500/20 text-red-400 border-red-500/50 animate-pulse'
-      case 'high':
-        return 'bg-orange-500/20 text-orange-400 border-orange-500/50'
-      case 'medium':
-        return 'bg-yellow-500/20 text-yellow-400 border-yellow-500/50'
-      case 'happening':
-        return 'bg-green-500/20 text-green-400 border-green-500/50'
-      case 'ended':
-        return 'bg-slate-700/40 text-slate-400 border-slate-600/50'
-      default:
-        return 'bg-slate-500/20 text-slate-400 border-slate-500/50'
+    const params = new URLSearchParams(window.location.search)
+    const wanted = params.get('flare')
+    if (!wanted) return
+
+    window.history.replaceState({}, '', '/flares')
+
+    const known = flares.find(f => f.id === wanted)
+    if (!known) {
+      toast.error('That flare isn’t around any more')
+      return
     }
-  }
+    // In the feed's list but outside its visibility window — the flare exists,
+    // it just isn't showing, and silently doing nothing would look broken.
+    if (!filteredFlares.some(f => f.id === wanted)) {
+      toast('That flare has already started or ended', {
+        description: 'You can still find it under My Activity if you joined it.',
+      })
+      return
+    }
+    setMode('join')
+    setSelectedFlare(known)
+  }, [isLoading, loadError, currentUser.id, flares, filteredFlares])
 
   // Asking for notification permission is deferred until the user has actually
   // done something (joined or created), so the request has obvious context
@@ -203,37 +241,62 @@ export default function FlaresPage() {
   }
 
   const handleJoinFlare = async (flareId) => {
-    // Update local state immediately for UI
-    setFlares(prev => prev.map(flare => {
-      if (flare.id === flareId && flare.attendees.length < flare.maxAttendees) {
-        return {
-          ...flare,
-          attendees: [...flare.attendees, { id: currentUser.id, name: currentUser.name }]
-        }
-      }
-      return flare
-    }))
-    setSelectedFlare(null)
+    const target = flares.find(f => f.id === flareId)
+    if (!target) return
 
-    // Save to database
+    // The capacity rule lives in one place now. This guard used to read
+    // `attendees.length < maxAttendees`, one seat looser than the rule the API
+    // enforces, so the last "successful" join was optimistically shown and
+    // silently rejected by a 400 nobody read.
+    if (getFlareCapacity(target).isFull) {
+      toast.error('That flare just filled up')
+      return
+    }
+
+    const joined = {
+      ...target,
+      // Guarded the way lib/flareCapacity.js does: this line sits outside the
+      // try below, so a flare document with no attendees array threw an
+      // unhandled rejection — no rollback, no toast, the join just died.
+      attendees: [...(target.attendees || []), { id: currentUser.id, name: currentUser.name }],
+    }
+
+    // Optimistic. Stay on the flare instead of closing: joining is what unlocks
+    // its chat, and in the desktop pane there is nothing being covered up.
+    setFlares(prev => prev.map(flare => (flare.id === flareId ? joined : flare)))
+    setSelectedFlare(prev => (prev?.id === flareId ? joined : prev))
+
     try {
-      const token = localStorage.getItem('iflare_token')
-      await fetch(`/api/flares/${flareId}/join`, {
+      const { token } = readStoredSession()
+      const res = await fetch(`/api/flares/${flareId}/join`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
+        // Deliberately no `flareData`: the endpoint has a leftover
+        // sample-data branch that *inserts* a client-supplied flare when the id
+        // isn't found, which would turn a join against a stale id into a
+        // silently created flare instead of the 404 this now reports.
         body: JSON.stringify({
           userId: currentUser.id,
           userName: currentUser.name,
-          // Also save the flare data for profile display
-          flareData: flares.find(f => f.id === flareId)
         })
       })
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.error || 'Could not join this flare')
+      }
+
+      toast.success(`You’re going to ${target.title}`)
       maybeAskForNotifications()
     } catch (err) {
       console.error('Error joining flare:', err)
+      // Roll back to exactly what was there before, in both places.
+      setFlares(prev => prev.map(flare => (flare.id === flareId ? target : flare)))
+      setSelectedFlare(prev => (prev?.id === flareId ? target : prev))
+      toast.error(err.message || 'Could not join this flare')
     }
   }
 
@@ -251,183 +314,245 @@ export default function FlaresPage() {
 
   const startingSoon = filteredFlares.filter(f => getTimeInfo(f.startTime).mins > 0)
   const happeningNow = filteredFlares.filter(f => getTimeInfo(f.startTime).mins <= 0)
+  const showFeed = !isLoading && !loadError
+
+  const searchField = (
+    <FlareSearch
+      value={searchQuery}
+      onChange={setSearchQuery}
+      userId={currentUser.id}
+      userInterests={currentUser.interests}
+      activeFilter={activeFilter}
+      onFilterChange={setActiveFilter}
+    />
+  )
 
   return (
-    <main>
-      {/* Header */}
-      <header className="mb-4 flex items-center justify-between gap-2 py-2">
-        {/* The shell owns the wordmark now — sidebar on desktop, sticky bar on
-            mobile — so this header is just the page title. */}
-        <h1 className="text-xl font-bold tracking-tight">Flares</h1>
+    <>
+      {/* The top bar owns the title and the bell from md up, so this header is
+          the mobile-only half of the same thing. */}
+      <header className="mb-4 flex items-center justify-between gap-2 py-2 md:hidden">
+        <h1 className="font-display text-xl font-bold">Flares</h1>
 
         <Link
           href="/notifications"
           aria-label={`Notifications${unreadCount > 0 ? ` (${unreadCount} unread)` : ''}`}
-          className="relative flex h-10 w-10 items-center justify-center rounded-full bg-slate-800/50 text-slate-400 transition-colors hover:text-white"
+          className="relative flex h-10 w-10 items-center justify-center rounded-full bg-surface-2 text-ink-subtle hover:text-ink"
         >
           <Bell className="h-5 w-5" />
-          {unreadCount > 0 && (
-            <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-xs font-bold text-white">
-              {unreadCount > 9 ? '9+' : unreadCount}
-            </span>
-          )}
+          <UnreadBadge count={unreadCount} className="absolute -right-1 -top-1" />
         </Link>
       </header>
 
-      {/* Mode switch — Join is the default */}
-      <div
-        role="tablist"
-        aria-label="Flare mode"
-        className="mb-5 grid grid-cols-2 gap-1 rounded-2xl border border-slate-800 bg-slate-900/60 p-1"
-      >
-        {[
-          { id: 'join', label: 'Join iFlare', icon: Zap },
-          { id: 'create', label: 'Create iFlare', icon: Plus },
-        ].map(({ id, label, icon: Icon }) => (
-          <button
-            key={id}
-            role="tab"
-            aria-selected={mode === id}
-            onClick={() => setMode(id)}
-            className={`flex items-center justify-center gap-2 rounded-xl py-3 text-sm font-semibold transition-colors ${
-              mode === id
-                ? 'bg-orange-600 text-white shadow'
-                : 'text-slate-400 hover:bg-slate-800/60 hover:text-white'
-            }`}
-          >
-            <Icon className="h-4 w-4" />
-            {label}
-          </button>
-        ))}
-      </div>
+      {/*
+        The two-pane desktop layout. Below lg this collapses to the single
+        column it has always been and the detail opens as a sheet; from lg the
+        feed keeps its 30rem reading width and the flare opens *beside* it, so
+        the chat stays on screen while the feed is still scannable.
+      */}
+      <Tabs value={mode} onValueChange={setMode}>
+        <div className="lg:grid lg:grid-cols-[minmax(0,30rem)_minmax(0,1fr)] lg:items-start lg:gap-6">
+          <div className="min-w-0">
+            {/* The shared segmented control, replacing one of the app's two
+                divergent hand-rolled switches. Join is the default. */}
+            <TabsList aria-label="Flare mode">
+              <TabsTrigger value="join">
+                <Zap />
+                Join a flare
+              </TabsTrigger>
+              <TabsTrigger value="create">
+                <Plus />
+                Create a flare
+              </TabsTrigger>
+            </TabsList>
 
-      {/* ---------------- Join mode ---------------- */}
-      {mode === 'join' && (
-        <>
-          <div className="mb-4">
-            <FlareSearch
-              value={searchQuery}
-              onChange={setSearchQuery}
-              userInterests={currentUser.interests}
-              activeFilter={activeFilter}
-              onFilterChange={setActiveFilter}
-            />
+            {/* ---------------- Join mode ---------------- */}
+            <TabsContent value="join" className="mt-5">
+              {topBarSlot ? (
+                createPortal(searchField, topBarSlot)
+              ) : (
+                <div className="mb-4">{searchField}</div>
+              )}
+
+              {activeFilter !== 'all' && (
+                <button
+                  onClick={() => setActiveFilter('all')}
+                  className="mb-4 inline-flex items-center gap-1.5 rounded-full border border-brand-500/40 bg-brand-500/10 px-3 py-1.5 text-xs font-medium text-brand-300 hover:bg-brand-500/15"
+                >
+                  Filtered by {activeFilter} · clear
+                </button>
+              )}
+
+              {showFeed && (
+                <div className="mb-5 rounded-xl border border-brand-500/20 bg-brand-500/10 px-4 py-3">
+                  <div className="flex items-center gap-2 text-sm font-medium text-brand-300">
+                    <Radar className="h-4 w-4" />
+                    <span>
+                      <span className="tabular">{filteredFlares.length}</span> flare
+                      {filteredFlares.length === 1 ? '' : 's'} matching your interests
+                    </span>
+                  </div>
+                  <p className="mt-1 flex items-center gap-1.5 text-xs text-ink-muted">
+                    <Clock className="h-3 w-3 shrink-0" />
+                    Flares appear 90 minutes before they start and drop off once they begin.
+                  </p>
+                </div>
+              )}
+
+              {isLoading && <FeedSkeleton />}
+
+              {loadError && <FeedError message={loadError} onRetry={() => fetchFlares()} />}
+
+              {showFeed && startingSoon.length > 0 && (
+                <FeedSection
+                  icon={Clock}
+                  iconClassName="text-brand-400"
+                  title="Starting Soon"
+                  count={startingSoon.length}
+                >
+                  {startingSoon.map(flare => (
+                    <FlareCard
+                      key={flare.id}
+                      flare={flare}
+                      currentUser={currentUser}
+                      selected={selectedFlare?.id === flare.id}
+                      onClick={() => setSelectedFlare(flare)}
+                      timeInfo={getTimeInfo(flare.startTime)}
+                    />
+                  ))}
+                </FeedSection>
+              )}
+
+              {showFeed && happeningNow.length > 0 && (
+                <FeedSection
+                  icon={Sparkles}
+                  iconClassName="text-success"
+                  title="Happening Now"
+                  count={happeningNow.length}
+                >
+                  {happeningNow.map(flare => (
+                    <FlareCard
+                      key={flare.id}
+                      flare={flare}
+                      currentUser={currentUser}
+                      selected={selectedFlare?.id === flare.id}
+                      onClick={() => setSelectedFlare(flare)}
+                      timeInfo={getTimeInfo(flare.startTime)}
+                    />
+                  ))}
+                </FeedSection>
+              )}
+
+              {showFeed && filteredFlares.length === 0 && (
+                <div className="relative overflow-hidden rounded-2xl border border-line-subtle bg-surface-1 py-12 text-center">
+                  <Sparkles className="mx-auto mb-3 h-10 w-10 text-brand-500/70" />
+                  <p className="font-display text-lg font-semibold">
+                    {searchQuery || activeFilter !== 'all'
+                      ? 'Nothing matches that right now'
+                      : 'No flares in the next 90 minutes'}
+                  </p>
+                  <p className="mt-1 text-sm text-ink-subtle">Be the first to create one!</p>
+                </div>
+              )}
+
+              {/* Create prompt at the end of the feed */}
+              {showFeed && (
+                <div className="mt-4 rounded-2xl border border-dashed border-line bg-surface-1/60 p-5 text-center">
+                  <p className="mb-1 font-display text-base font-semibold">Nothing here for you?</p>
+                  <p className="mb-4 text-sm text-ink-muted">
+                    Post what you&apos;re doing and let people come to you.
+                  </p>
+                  <Button size="lg" className="w-full" onClick={() => setMode('create')}>
+                    <Plus className="h-5 w-5" />
+                    Create a flare
+                  </Button>
+                </div>
+              )}
+            </TabsContent>
+
+            {/* ---------------- Create mode ---------------- */}
+            <TabsContent value="create" className="mt-5">
+              <CreateFlareForm
+                currentUser={currentUser}
+                onCreated={handleFlareCreated}
+                onCancel={() => setMode('join')}
+              />
+            </TabsContent>
           </div>
 
-          {activeFilter !== 'all' && (
-            <button
-              onClick={() => setActiveFilter('all')}
-              className="mb-4 inline-flex items-center gap-1.5 rounded-full border border-orange-500/40 bg-orange-500/10 px-3 py-1.5 text-xs font-medium text-orange-300"
-            >
-              Filtered by {activeFilter} · clear
-            </button>
-          )}
+          {/* Detail pane — lg and up only; it hides itself below that. */}
+          <FlareDetailPanel
+            flare={mode === 'join' ? selectedFlare : null}
+            onClose={() => setSelectedFlare(null)}
+            onJoin={() => handleJoinFlare(selectedFlare.id)}
+            currentUser={currentUser}
+            timeInfo={selectedFlare ? getTimeInfo(selectedFlare.startTime) : null}
+          />
+        </div>
+      </Tabs>
 
-          <div className="mb-5 rounded-xl border border-orange-500/20 bg-orange-500/10 px-4 py-3">
-            <div className="flex items-center gap-2 text-sm text-orange-400">
-              <Radar className="h-4 w-4" />
-              <span>
-                {filteredFlares.length} flare{filteredFlares.length === 1 ? '' : 's'} matching
-                your interests
-              </span>
-            </div>
-            <p className="mt-1 flex items-center gap-1.5 text-xs text-orange-300/80">
-              <Clock className="h-3 w-3" />
-              iFlares appear 90 minutes before they start and drop off once they begin.
-            </p>
-          </div>
-
-          {startingSoon.length > 0 && (
-            <section className="mb-6">
-              <div className="mb-3 flex items-center gap-2">
-                <Clock className="h-5 w-5 text-orange-400" />
-                <h2 className="text-lg font-semibold">Starting Soon</h2>
-                <span className="text-sm text-slate-500">{startingSoon.length}</span>
-              </div>
-              <div className="space-y-3">
-                {startingSoon.map(flare => (
-                  <FlareCard
-                    key={flare.id}
-                    flare={flare}
-                    onClick={() => setSelectedFlare(flare)}
-                    timeInfo={getTimeInfo(flare.startTime)}
-                    getUrgencyStyles={getUrgencyStyles}
-                  />
-                ))}
-              </div>
-            </section>
-          )}
-
-          {happeningNow.length > 0 && (
-            <section className="mb-6">
-              <div className="mb-3 flex items-center gap-2">
-                <Sparkles className="h-5 w-5 text-green-400" />
-                <h2 className="text-lg font-semibold">Happening Now</h2>
-                <span className="text-sm text-slate-500">{happeningNow.length}</span>
-              </div>
-              <div className="space-y-3">
-                {happeningNow.map(flare => (
-                  <FlareCard
-                    key={flare.id}
-                    flare={flare}
-                    onClick={() => setSelectedFlare(flare)}
-                    timeInfo={getTimeInfo(flare.startTime)}
-                    getUrgencyStyles={getUrgencyStyles}
-                  />
-                ))}
-              </div>
-            </section>
-          )}
-
-          {filteredFlares.length === 0 && (
-            <div className="py-12 text-center">
-              <Sparkles className="mx-auto mb-3 h-12 w-12 text-slate-600" />
-              <p className="text-slate-400">
-                {searchQuery || activeFilter !== 'all'
-                  ? 'Nothing matches that right now'
-                  : 'No iFlares in the next 90 minutes'}
-              </p>
-              <p className="mt-1 text-sm text-slate-500">Be the first to create one!</p>
-            </div>
-          )}
-
-          {/* Create prompt at the end of the feed */}
-          <div className="mt-2 rounded-2xl border border-dashed border-slate-700 bg-slate-900/40 p-5 text-center">
-            <p className="mb-1 font-medium text-white">Nothing here for you?</p>
-            <p className="mb-4 text-sm text-slate-400">
-              Post what you&apos;re doing and let people come to you.
-            </p>
-            <Button
-              onClick={() => setMode('create')}
-              className="h-12 w-full rounded-xl bg-orange-600 font-semibold text-white hover:bg-orange-700"
-            >
-              <Plus className="mr-2 h-5 w-5" />
-              Create an iFlare
-            </Button>
-          </div>
-        </>
-      )}
-
-      {/* ---------------- Create mode ---------------- */}
-      {mode === 'create' && (
-        <CreateFlareForm
-          currentUser={currentUser}
-          onCreated={handleFlareCreated}
-          onCancel={() => setMode('join')}
-        />
-      )}
-
-      {/* Flare Detail Modal */}
+      {/* Same flare, sheet form, below lg. The wrapper is what keeps the sheet
+          and the pane from both being on screen for one selection. */}
       {selectedFlare && (
-        <FlareDetailModal
-          flare={selectedFlare}
-          onClose={() => setSelectedFlare(null)}
-          onJoin={() => handleJoinFlare(selectedFlare.id)}
-          currentUser={currentUser}
-          timeInfo={getTimeInfo(selectedFlare.startTime)}
-          getUrgencyStyles={getUrgencyStyles}
-        />
+        <div className="lg:hidden">
+          <FlareDetailModal
+            flare={selectedFlare}
+            onClose={() => setSelectedFlare(null)}
+            onJoin={() => handleJoinFlare(selectedFlare.id)}
+            currentUser={currentUser}
+            timeInfo={getTimeInfo(selectedFlare.startTime)}
+          />
+        </div>
       )}
-    </main>
+    </>
+  )
+}
+
+/** A titled run of cards — "Starting Soon", "Happening Now". */
+function FeedSection({ icon: Icon, iconClassName, title, count, children }) {
+  return (
+    <section className="mb-6">
+      <div className="mb-3 flex items-center gap-2">
+        <Icon className={`h-5 w-5 ${iconClassName}`} />
+        <h2 className="font-display text-lg font-semibold">{title}</h2>
+        <span className="tabular text-sm text-ink-subtle">{count}</span>
+      </div>
+      <div className="space-y-3">{children}</div>
+    </section>
+  )
+}
+
+/**
+ * What the feed shows while it is actually fetching. Three cards rather than a
+ * spinner, so the layout it is about to fill is already the shape on screen —
+ * which also means the two-pane grid doesn't jump when the data lands.
+ */
+function FeedSkeleton() {
+  return (
+    <div className="space-y-3" aria-busy="true" aria-label="Loading flares">
+      {[0, 1, 2].map(i => (
+        <FlareCardSkeleton key={i} />
+      ))}
+    </div>
+  )
+}
+
+/** The state a failed fetch used to be indistinguishable from an empty campus. */
+function FeedError({ message, onRetry }) {
+  return (
+    <div
+      role="alert"
+      className="rounded-2xl border border-danger/30 bg-danger/5 px-5 py-8 text-center"
+    >
+      <AlertTriangle className="mx-auto mb-3 h-8 w-8 text-danger" />
+      <p className="font-display text-lg font-semibold">{message}</p>
+      <p className="mt-1 text-sm text-ink-muted">
+        This is us, not your campus — there may well be flares on right now.
+      </p>
+      <Button variant="soft" className="mt-4" onClick={onRetry}>
+        <RotateCw className="h-4 w-4" />
+        Try again
+      </Button>
+    </div>
   )
 }

@@ -2,74 +2,175 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * iFLARE design tokens.
+ *
+ * The dark palette lives on `:root` as well as `.dark`. next-themes only adds
+ * the class after hydration, so when the dark values lived solely under `.dark`
+ * the server-rendered first paint used the light block — a white flash on every
+ * cold load. `.light` is parked below for a future toggle and is untested.
+ *
+ * Everything downstream (tailwind.config.js, the 49 shadcn primitives, the page
+ * sweep) reads these variables. Retuning the product's colour means editing this
+ * block, not the pages.
+ */
 @layer base {
-  :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-    --primary: 24.6 95% 53.1%;
-    --primary-foreground: 60 9.1% 97.8%;
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 24.6 95% 53.1%;
-    --radius: 0.75rem;
+  :root,
+  .dark {
+    /* ---- Elevation ramp -------------------------------------------------
+       Four opaque steps, lifted off pure black. The previous background was
+       slate-950 (#020617), close enough to black that nothing could sit
+       *below* a card; starting at 7% lightness leaves room for real depth. */
+    --surface-0: 228 24% 7%; /* app background          */
+    --surface-1: 228 20% 11%; /* card, sidebar           */
+    --surface-2: 228 18% 15%; /* raised: popover, sheet  */
+    --surface-3: 228 16% 19%; /* control fill: input     */
 
-    --sidebar-background: 0 0% 98%;
-    --sidebar-foreground: 222.2 47.4% 11.2%;
-    --sidebar-primary: 24.6 95% 53.1%;
-    --sidebar-primary-foreground: 60 9.1% 97.8%;
-    --sidebar-accent: 210 40% 96.1%;
-    --sidebar-accent-foreground: 222.2 47.4% 11.2%;
-    --sidebar-border: 214.3 31.8% 91.4%;
-    --sidebar-ring: 24.6 95% 53.1%;
+    --line-subtle: 228 16% 17%;
+    --line-default: 228 14% 24%;
+    --line-strong: 228 13% 33%;
+
+    /* ---- Text ramp ------------------------------------------------------
+       --text-tertiary clears 4.5:1 on both surface-0 and surface-1. It
+       replaces text-slate-500, which was the app's most-used text colour
+       (100 occurrences) at roughly 4.1:1 and usually set at text-xs. */
+    --text-primary: 228 32% 97%;
+    --text-secondary: 228 14% 74%;
+    --text-tertiary: 228 11% 58%;
+    --text-disabled: 228 10% 42%;
+
+    /* ---- Brand ----------------------------------------------------------
+       Orange stays the brand: the Radar mark, the name and the "flare"
+       metaphor all depend on it. What changes is that there is now exactly
+       one of each step — the pages had drifted into using orange-500 and
+       orange-600 as two competing primaries. */
+    --brand-300: 31 97% 72%;
+    --brand-400: 27 96% 61%;
+    --brand-500: 25 95% 53%;
+    --brand-600: 21 90% 48%;
+    --brand-700: 17 88% 40%;
+
+    /* ---- Semantic -------------------------------------------------------
+       One colour per meaning. Previously "success" was green-500, emerald-400
+       and orange-300 depending on the file, and --destructive was red-900
+       (#7f1d1d) — so dark that every error in the app bypassed it for a raw
+       red-400. The `-strong` variants are the saturated fill; the base is the
+       readable-on-dark text tone. */
+    --success: 158 64% 52%;
+    --success-strong: 160 84% 39%;
+    --warning: 43 96% 62%;
+    --warning-strong: 38 92% 50%;
+    --danger: 0 84% 68%;
+    --danger-strong: 0 72% 51%;
+
+    /* ---- Geometry -------------------------------------------------------
+       Every radius in tailwind.config.js derives from this one value. */
+    --radius: 0.875rem; /* 14px */
+
+    /* ---- Motion ---------------------------------------------------------- */
+    --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
+    --ease-out-back: cubic-bezier(0.34, 1.4, 0.64, 1);
+    --duration-fast: 120ms;
+    --duration-base: 200ms;
+    --duration-slow: 320ms;
+
+    /* ---- shadcn aliases --------------------------------------------------
+       Pointed at the ramp above so all 49 generated primitives inherit the
+       new system without being edited. var() substitution is textual, so
+       hsl(var(--background)) resolves through to the surface triplet. */
+    --background: var(--surface-0);
+    --foreground: var(--text-primary);
+    --card: var(--surface-1);
+    --card-foreground: var(--text-primary);
+    --popover: var(--surface-2);
+    --popover-foreground: var(--text-primary);
+    --primary: var(--brand-500);
+    --primary-foreground: 24 30% 98%;
+    --secondary: var(--surface-2);
+    --secondary-foreground: var(--text-primary);
+    --muted: var(--surface-2);
+    --muted-foreground: var(--text-tertiary);
+    --accent: var(--surface-2);
+    --accent-foreground: var(--text-primary);
+    --destructive: var(--danger-strong);
+    --destructive-foreground: 0 30% 98%;
+    --border: var(--line-subtle);
+    --input: var(--line-default);
+    --ring: var(--brand-500);
+
+    /* Referenced by tailwind.config.js but never defined before, so every
+       chart-* utility resolved to an invalid colour. */
+    --chart-1: var(--brand-500);
+    --chart-2: 199 89% 55%;
+    --chart-3: var(--success);
+    --chart-4: var(--warning);
+    --chart-5: 271 81% 66%;
+
+    --sidebar-background: var(--surface-1);
+    --sidebar-foreground: var(--text-secondary);
+    --sidebar-primary: var(--brand-500);
+    --sidebar-primary-foreground: 24 30% 98%;
+    --sidebar-accent: var(--surface-2);
+    --sidebar-accent-foreground: var(--text-primary);
+    --sidebar-border: var(--line-subtle);
+    --sidebar-ring: var(--brand-500);
+
+    /* ---- Layout ----------------------------------------------------------
+       Two widths, not one.
+
+       --app-column-width is the *reading* column: the mobile-style single
+       stack every page has always used. --app-canvas-width is the wider
+       working area a page opts into when it has a genuine desktop layout
+       (the feed + detail two-pane on /flares and /activity, the two-column
+       /profile and /settings). Below lg they are identical, so a page that
+       opts into the canvas is unchanged on a phone.
+
+       Both are overridden per breakpoint below rather than being set with
+       Tailwind responsive classes, because AppShell picks the wrapper class
+       and the pages read the same value through max-w-column / max-w-canvas. */
+    --app-column-width: 30rem;
+    --app-canvas-width: 30rem;
   }
 
-  /*
-   * iFLARE ships dark-only today. These values intentionally mirror the
-   * slate-950/slate-900/orange-500 palette the pages already hardcode, so
-   * shadcn primitives (which read these tokens) render on-brand instead of
-   * the stock neutral theme they'd otherwise pick up.
-   */
-  .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-    --card: 222.2 47.4% 11.2%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222.2 47.4% 11.2%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 24.6 95% 53.1%;
-    --primary-foreground: 60 9.1% 97.8%;
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 24.6 95% 53.1%;
+  /* The audit's "desktop looks like a phone" finding: 30rem capped content at
+     480px at *every* width. The column still stays a column — long-form text
+     is unreadable much wider — it just stops being phone-sized. */
+  @media (min-width: 768px) {
+    :root,
+    .dark {
+      --app-column-width: 34rem;
+      --app-canvas-width: 34rem;
+    }
+  }
 
-    --sidebar-background: 222.2 47.4% 11.2%;
-    --sidebar-foreground: 210 40% 98%;
-    --sidebar-primary: 24.6 95% 53.1%;
-    --sidebar-primary-foreground: 60 9.1% 97.8%;
-    --sidebar-accent: 217.2 32.6% 17.5%;
-    --sidebar-accent-foreground: 210 40% 98%;
-    --sidebar-border: 217.2 32.6% 17.5%;
-    --sidebar-ring: 24.6 95% 53.1%;
+  /* Where the real desktop layout begins. 68rem holds a 30rem feed beside a
+     34rem detail pane with a gutter between them. */
+  @media (min-width: 1024px) {
+    :root,
+    .dark {
+      --app-canvas-width: 68rem;
+    }
+  }
+
+  /* Parked. iFLARE ships dark-only (ClientProviders pins next-themes to dark
+     with enableSystem={false}); this block is untested. */
+  .light {
+    --surface-0: 228 30% 99%;
+    --surface-1: 0 0% 100%;
+    --surface-2: 228 30% 97%;
+    --surface-3: 228 26% 94%;
+
+    --line-subtle: 228 22% 92%;
+    --line-default: 228 20% 86%;
+    --line-strong: 228 16% 72%;
+
+    --text-primary: 228 40% 10%;
+    --text-secondary: 228 14% 34%;
+    --text-tertiary: 228 12% 46%;
+    --text-disabled: 228 12% 64%;
+
+    --primary-foreground: 24 30% 98%;
+    --destructive-foreground: 0 30% 98%;
   }
 }
 
@@ -77,32 +178,110 @@
   * {
     @apply border-border;
   }
+
+  html {
+    /* Native form controls (the date/time pickers in the create flow) render
+       their glyphs light only when the UA knows the page is dark. */
+    color-scheme: dark;
+    -webkit-tap-highlight-color: transparent;
+  }
+
   body {
-    @apply bg-background text-foreground;
-    font-feature-settings: "rlig" 1, "calt" 1;
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
+    @apply bg-background font-sans text-ink antialiased;
+    font-feature-settings: 'rlig' 1, 'calt' 1;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* Headings default to the display face; a page can still opt out with
+     font-sans. Tracking comes from the fontSize scale in tailwind.config.js. */
+  h1,
+  h2,
+  h3 {
+    @apply font-display;
+  }
+
+  /*
+   * Focus. The app previously relied on shadcn's 1px focus-visible:ring, which
+   * every hand-rolled `focus:border-orange-500` visually overrode — so keyboard
+   * users had no reliable indicator anywhere.
+   */
+  :focus-visible {
+    @apply outline-none ring-2 ring-brand-500/70 ring-offset-2 ring-offset-surface-0;
+  }
+
+  ::selection {
+    background-color: hsl(var(--brand-500) / 0.3);
+    color: hsl(var(--text-primary));
   }
 }
 
 @layer components {
   /*
-   * The app shell keeps a single mobile-style column on every viewport —
-   * desktop gets the same vertical product, with the extra horizontal space
-   * spent on the sidebar/contextual UI rather than a wider content area.
+   * The reading column — one mobile-style stack, 30rem on a phone and 34rem
+   * from md up. Pages with no desktop layout of their own stay here.
    */
   .app-column {
-    @apply mx-auto w-full max-w-[var(--app-column-width)];
+    @apply mx-auto w-full max-w-column;
+  }
+
+  /*
+   * The wide working area. Identical to .app-column below lg, so opting in
+   * costs a page nothing on mobile; from lg it opens up to 68rem for the
+   * two-pane and two-column layouts. AppShell chooses between the two per
+   * route — see WIDE_ROUTES there.
+   */
+  .app-canvas {
+    @apply mx-auto w-full max-w-canvas;
+  }
+
+  /*
+   * The one horizontal gutter. The shell used px-4 while the landing, auth and
+   * info pages used px-6, so content shifted sideways when you crossed between
+   * them.
+   */
+  .app-gutter {
+    @apply px-4 sm:px-6;
+  }
+
+  /*
+   * Lining figures for anything that counts or ticks — spots (3/6), countdowns,
+   * OTP digits. Proportional digits change width as they change value, which
+   * makes a live timer visibly jitter.
+   */
+  .tabular {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: 'tnum' 1;
+  }
+
+  /*
+   * Staggered list entrance. Set `style={{ '--i': index }}` on each child and
+   * give it `animate-fade-in-up stagger`; the delay is capped so a long feed
+   * doesn't leave the last card waiting seconds.
+   */
+  .stagger {
+    animation-delay: calc(min(var(--i, 0), 8) * 45ms);
   }
 }
 
-:root {
-  --app-column-width: 30rem;
+@layer utilities {
+  /* Wide content (chip rows, venue grids) scrolls without advertising a bar. */
+  .no-scrollbar {
+    scrollbar-width: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
 }
 
-/* Custom scrollbar for mobile-first design */
+/* Scrollbars. The previous rules were WebKit-only and hardcoded white alpha. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: hsl(var(--line-strong)) transparent;
+}
+
 ::-webkit-scrollbar {
-  width: 4px;
+  width: 6px;
+  height: 6px;
 }
 
 ::-webkit-scrollbar-track {
@@ -110,17 +289,52 @@
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 4px;
+  background: hsl(var(--line-strong));
+  border-radius: 999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.2);
+  background: hsl(var(--text-disabled));
 }
 
-/* Smooth transitions */
-* {
-  transition-property: color, background-color, border-color, text-decoration-color, fill, stroke, opacity, box-shadow, transform, filter, backdrop-filter;
-  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-  transition-duration: 150ms;
+/*
+ * Motion is opt-in per element from here on.
+ *
+ * This file used to end with a blanket `* { transition-property: color,
+ * background-color, ..., transform, filter, backdrop-filter; duration: 150ms }`.
+ * It animated ten properties on every node in the tree — including Radix
+ * portals, where it added a competing 150ms transform transition that fought
+ * tailwindcss-animate's enter/exit keyframes and partially defeated
+ * next-themes' disableTransitionOnChange. It also made every explicit
+ * `duration-300`/`duration-500` in the codebase a lie. Interactive elements get
+ * the transition instead; anything else opts in with a transition-* class.
+ */
+a,
+button,
+input,
+select,
+textarea,
+summary,
+[role='button'],
+[role='tab'],
+[role='option'],
+[data-slot='control'] {
+  transition-property: color, background-color, border-color, box-shadow, opacity, transform;
+  transition-timing-function: var(--ease-out-quart);
+  transition-duration: var(--duration-base);
+}
+
+/*
+ * There was no reduced-motion handling at all, despite two infinite
+ * `animate-pulse` elements (the critical-urgency card tint and the join CTA).
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

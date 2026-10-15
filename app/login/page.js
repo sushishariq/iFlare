@@ -1,11 +1,13 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Radar, ArrowLeft, Eye, EyeOff, Mail, Loader2, AlertCircle } from 'lucide-react'
+import FormBanner from '@/components/FormBanner'
+import Logo from '@/components/Logo'
+import { ArrowLeft, Eye, EyeOff, Mail, Loader2, AlertCircle } from 'lucide-react'
 import { resolveUniversity } from '@/lib/universities'
 
 export default function LoginPage() {
@@ -22,6 +24,23 @@ export default function LoginPage() {
   // "create an account" route alongside the error.
   const [showSignupHint, setShowSignupHint] = useState(false)
   const [domainError, setDomainError] = useState('')
+  const [notice, setNotice] = useState('')
+
+  /*
+   * /forgot-password ends by pushing here with ?reset=1, and nothing read it —
+   * so the last thing a password reset did was drop you on a plain sign-in
+   * form with no word about whether it had worked.
+   *
+   * Read from location rather than useSearchParams: that hook forces this page
+   * under a Suspense boundary at build time, and the fallback would flash on
+   * every cold load of the app's main entrance for the sake of one flag.
+   */
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('reset') === '1') {
+      setNotice('Password updated. Sign in with your new password.')
+    }
+  }, [])
 
   const handleInputChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value })
@@ -51,6 +70,7 @@ export default function LoginPage() {
 
     setIsLoading(true)
     setError('')
+    setNotice('')
     setShowSignupHint(false)
 
     try {
@@ -82,58 +102,57 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="min-h-screen bg-background">
-      <div className="app-column flex min-h-screen flex-col px-6 py-8">
+    <main className="relative min-h-screen overflow-hidden bg-background">
+
+      <div className="app-column app-gutter relative flex min-h-screen flex-col py-8">
         {/* Header */}
         <div className="mb-12 flex items-center justify-between">
           <button
             onClick={() => router.push('/')}
             aria-label="Back"
-            className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-800/50 text-slate-400 transition-colors hover:text-white"
+            className="flex h-10 w-10 items-center justify-center rounded-full bg-surface-2 text-ink-muted hover:bg-surface-3 hover:text-ink"
           >
             <ArrowLeft className="h-5 w-5" />
           </button>
 
-          <div className="flex items-center gap-2">
-            <Radar className="h-6 w-6 text-orange-500" />
-            <span className="text-lg font-bold">iFLARE</span>
-          </div>
+          <Logo size="md" />
 
           <div className="w-10" />
         </div>
 
         {/* Login form — a real <form> so Enter submits from either field. */}
         <form onSubmit={handleLogin} className="flex flex-1 flex-col">
-          <h1 className="mb-2 text-2xl font-bold">Welcome back</h1>
-          <p className="mb-8 text-slate-400">Sign in to continue to iFLARE</p>
+          <h1 className="mb-2 text-3xl font-bold">Welcome back</h1>
+          <p className="mb-8 text-ink-muted">Sign in to continue to iFLARE</p>
 
-          {error && (
-            <div className="mb-4 rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-400">
-              <p className="flex items-start gap-2">
-                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-                <span>{error}</span>
-              </p>
-              {showSignupHint && (
-                <p className="mt-2 pl-6 text-slate-400">
-                  Don&apos;t have an account yet?{' '}
-                  <Link
-                    href="/register"
-                    className="font-medium text-orange-400 transition-colors hover:text-orange-300"
-                  >
-                    Create one
-                  </Link>
-                </p>
-              )}
-            </div>
-          )}
+          <FormBanner tone="success">{notice}</FormBanner>
+
+          <FormBanner tone="error">
+            {error && (
+              <>
+                <p>{error}</p>
+                {showSignupHint && (
+                  <p className="mt-2 text-ink-muted">
+                    Don&apos;t have an account yet?{' '}
+                    <Link
+                      href="/register"
+                      className="font-medium text-brand-400 hover:text-brand-300"
+                    >
+                      Create one
+                    </Link>
+                  </p>
+                )}
+              </>
+            )}
+          </FormBanner>
 
           <div className="mb-6 space-y-4">
             <div>
-              <label htmlFor="email" className="mb-2 block text-sm text-slate-400">
+              <label htmlFor="email" className="mb-2 block text-sm text-ink-muted">
                 Email
               </label>
               <div className="relative">
-                <Mail className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-500" />
+                <Mail className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-ink-subtle" />
                 <Input
                   id="email"
                   name="email"
@@ -143,28 +162,27 @@ export default function LoginPage() {
                   onChange={handleInputChange}
                   onBlur={validateDomain}
                   aria-invalid={Boolean(domainError)}
+                  aria-describedby="email-hint"
                   placeholder="you@university.ac.in"
-                  className={`h-14 rounded-xl bg-slate-800/50 pl-12 text-white placeholder:text-slate-500 ${
-                    domainError
-                      ? 'border-red-500/60 focus:border-red-500'
-                      : 'border-slate-700 focus:border-orange-500'
+                  className={`h-14 rounded-xl pl-12 ${
+                    domainError ? 'border-danger focus:border-danger' : ''
                   }`}
                 />
               </div>
               {domainError ? (
-                <p className="mt-2 flex items-start gap-1.5 text-xs text-red-400">
-                  <AlertCircle className="mt-0.5 h-3 w-3 shrink-0" />
+                <p id="email-hint" className="mt-2 flex items-start gap-1.5 text-xs text-danger">
+                  <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                   <span>{domainError}</span>
                 </p>
               ) : (
-                <p className="mt-2 text-xs text-slate-500">
+                <p id="email-hint" className="mt-2 text-xs text-ink-subtle">
                   Use the email your university gave you.
                 </p>
               )}
             </div>
 
             <div>
-              <label htmlFor="password" className="mb-2 block text-sm text-slate-400">
+              <label htmlFor="password" className="mb-2 block text-sm text-ink-muted">
                 Password
               </label>
               <div className="relative">
@@ -176,13 +194,13 @@ export default function LoginPage() {
                   value={formData.password}
                   onChange={handleInputChange}
                   placeholder="Enter your password"
-                  className="h-14 rounded-xl border-slate-700 bg-slate-800/50 pr-12 text-white placeholder:text-slate-500 focus:border-orange-500"
+                  className="h-14 rounded-xl pr-12"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
                   aria-label={showPassword ? 'Hide password' : 'Show password'}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300"
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-ink-subtle hover:text-ink"
                 >
                   {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                 </button>
@@ -193,7 +211,7 @@ export default function LoginPage() {
           <button
             type="button"
             onClick={() => router.push('/forgot-password')}
-            className="mb-8 text-left text-sm text-orange-400 transition-colors hover:text-orange-300"
+            className="mb-8 self-start text-sm text-brand-400 hover:text-brand-300"
           >
             Forgot password?
           </button>
@@ -201,26 +219,27 @@ export default function LoginPage() {
           <div className="mt-auto">
             <Button
               type="submit"
+              size="lg"
+              className="w-full"
               disabled={!formData.email || !formData.password || isLoading}
-              className="h-14 w-full rounded-2xl bg-orange-600 text-lg font-semibold text-white hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {isLoading ? (
-                <span className="flex items-center gap-2">
+                <>
                   <Loader2 className="h-5 w-5 animate-spin" />
                   Signing in...
-                </span>
+                </>
               ) : (
-                'Sign In'
+                'Sign in'
               )}
             </Button>
 
-            <p className="mt-6 text-center text-sm text-slate-500">
+            <p className="mt-6 text-center text-sm text-ink-subtle">
               Still not registered?{' '}
               <Link
                 href="/register"
-                className="font-medium text-orange-400 transition-colors hover:text-orange-300"
+                className="font-medium text-brand-400 hover:text-brand-300"
               >
-                Get Started
+                Get started
               </Link>
             </p>
           </div>
