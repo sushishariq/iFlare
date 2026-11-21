@@ -10,7 +10,6 @@ import {
   ArrowRight,
   ArrowLeft,
   X,
-  Sparkles,
 } from 'lucide-react'
 
 // Scoped per account: a shared laptop shouldn't swallow the walkthrough for
@@ -135,11 +134,8 @@ export default function OnboardingWalkthrough() {
 function AskStage({ onYes, onNo }) {
   return (
     <>
-      <div className="mb-3 flex items-center gap-2.5 pr-7">
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-orange-500/40 bg-orange-500/10">
-          <Sparkles className="h-4 w-4 text-orange-500" strokeWidth={1.75} />
-        </span>
-        <h2 className="text-sm font-semibold text-white">Welcome to iFLARE</h2>
+      <div className="mb-3 pr-7">
+        <h2 className="text-sm font-semibold text-slate-100">Welcome to iFLARE</h2>
       </div>
 
       <p className="mb-4 text-xs leading-relaxed text-slate-400">

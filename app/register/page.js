@@ -32,6 +32,7 @@ import {
   searchUniversities,
 } from '@/lib/universityOptions'
 import InterestSelector from '@/components/InterestSelector'
+import ThemeToggle from '@/components/ThemeToggle'
 
 const STEPS = ['University', 'Account', 'Verify', 'Personalise']
 const BIO_MAX_LENGTH = 300
@@ -175,8 +176,13 @@ export default function RegisterPage() {
         return
       }
 
-      setInfo(`We sent a 6-digit code to ${formData.email.trim().toLowerCase()}.`)
-      setOtp('')
+      if (data.developmentOtp) {
+        setInfo(`Development mode: use verification code ${data.developmentOtp}.`)
+        setOtp(data.developmentOtp)
+      } else {
+        setInfo(`We sent a 6-digit code to ${formData.email.trim().toLowerCase()}.`)
+        setOtp('')
+      }
       setResendCooldown(60)
       setStep(3)
     } catch (err) {
@@ -244,7 +250,12 @@ export default function RegisterPage() {
       if (!response.ok) {
         setError(data.error || 'Could not resend code')
       } else {
-        setInfo('A new code has been sent.')
+        if (data.developmentOtp) {
+          setOtp(data.developmentOtp)
+          setInfo(`Development mode: use verification code ${data.developmentOtp}.`)
+        } else {
+          setInfo('A new code has been sent.')
+        }
         setResendCooldown(60)
       }
     } catch (err) {
@@ -321,7 +332,7 @@ export default function RegisterPage() {
 
   return (
     <main className="min-h-screen bg-background">
-      <div className="app-column flex min-h-screen flex-col px-6 py-8">
+      <div className="app-column flex min-h-screen max-w-lg flex-col px-6 py-8">
         {/* Header */}
         <div className="mb-8 flex items-center justify-between">
           {canGoBack ? (
@@ -341,7 +352,7 @@ export default function RegisterPage() {
             <span className="text-lg font-bold">iFLARE</span>
           </div>
 
-          <div className="w-10" />
+          <ThemeToggle className="scale-90 origin-right" />
         </div>
 
         <StepProgress steps={STEPS} currentStep={step} />

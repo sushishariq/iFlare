@@ -233,8 +233,7 @@ University → Account → OTP → Personalisation.
 
 **Tests / checks performed**
 
-- `next build` — compiles successfully, all 18 routes generated, no new warnings. (It needs
-  `RESEND_API_KEY` set to anything, see Known issues.)
+- `next build` — compiles successfully, all routes generated, no new warnings.
 - Ran `next start` and verified over HTTP:
   - `/` — grid backdrop markup gone (0 occurrences), root is
     `class="relative min-h-screen overflow-hidden bg-background"`.
@@ -248,11 +247,8 @@ University → Account → OTP → Personalisation.
 
 **Known issues / notes for later**
 
-- `next build` fails at page-data collection with `Missing API key. Pass it to the constructor
-  new Resend(...)` when `RESEND_API_KEY` is unset, because `app/api/[[...path]]/route.js:108`
-  constructs the client at module scope. **Pre-existing, unrelated to Phase 1** (there's no `.env` in
-  this checkout). Workaround for local builds: `RESEND_API_KEY=anything next build`. Worth making the
-  client lazy at some point.
+- Resolved: email delivery now uses a lazy Nodemailer SMTP transport. Missing local SMTP
+  credentials use the development OTP fallback; production requires `SMTP_USER` and `SMTP_PASS`.
 - Signed-in visitors to an info page see public chrome for one frame before the shell mounts, since
   the session is only knowable client-side. Accepted; the alternative is a blank page.
 - Swipe gestures are touch-only by design — no mouse-drag equivalent on desktop, where the sidebar is

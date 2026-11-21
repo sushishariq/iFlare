@@ -17,7 +17,7 @@
 | Icons            | lucide-react (`Radar` icon is the brand mark)       |
 | Database         | **MongoDB** (local, inside container)               |
 | Auth             | Custom (email + SHA-256 password + base64 token)    |
-| Email (disabled) | Resend (`resend` npm package, key present in `.env`)|
+| Email            | SMTP via Nodemailer; Gmail App Password supported   |
 | Process manager  | `supervisor` — nextjs runs on `0.0.0.0:3000`        |
 
 Hot reload is enabled: editing files under `/app/app` or `/app/components`
@@ -63,7 +63,13 @@ takes effect without a restart.
 | `MONGO_URL`           | MongoDB connection string. **In preview:** `mongodb://localhost:27017`      |
 | `DB_NAME`             | Database name. Currently `iflare`                                            |
 | `NEXT_PUBLIC_BASE_URL`| Public base URL, e.g. `https://iflare-preview.preview.emergentagent.com`    |
-| `RESEND_API_KEY`      | Resend API key for email verification (currently unused in the flow)        |
+| `SMTP_HOST`           | SMTP hostname (`smtp.gmail.com` for Gmail)                                  |
+| `SMTP_PORT`           | SMTP port (`465` for implicit TLS, `587` for STARTTLS)                      |
+| `SMTP_SECURE`         | `true` with port 465; normally `false` with port 587                        |
+| `SMTP_USER`           | SMTP username; your full Gmail address for Gmail                            |
+| `SMTP_PASS`           | SMTP password; use a Google App Password, not your Google password          |
+| `SMTP_FROM_NAME`      | Display name for outgoing email (default `iFLARE`)                          |
+| `SMTP_FROM_EMAIL`     | Sender address (defaults to `SMTP_USER`)                                    |
 | `CORS_ORIGINS`        | Optional. Overrides the `Access-Control-Allow-Origin` header (default `*`)  |
 
 > ⚠️ **Never modify `MONGO_URL` or `NEXT_PUBLIC_BASE_URL`** — these are
@@ -441,7 +447,7 @@ needed for `.env` changes or new npm dependencies.
 
 ## 12. Known Backlog
 
-- Re-enable email verification via Resend.
+- Configure SMTP credentials for production OTP and password-reset delivery.
 - Google Login (postponed).
 - Google Maps venue picker (currently free-text `location.name`).
 - Password reset flow.

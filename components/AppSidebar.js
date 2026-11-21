@@ -29,6 +29,7 @@ import {
   SidebarRail,
 } from '@/components/ui/sidebar'
 import { useNotificationContext } from '@/lib/NotificationProvider'
+import ThemeToggle from '@/components/ThemeToggle'
 
 // `available: false` items are nav destinations the redesign introduces but
 // whose pages land in a later phase — they render disabled rather than as
@@ -64,7 +65,7 @@ function NavItem({ item, isActive, unreadCount }) {
         isActive={isActive}
         tooltip={item.title}
         aria-disabled={!item.available}
-        className={item.available ? undefined : 'cursor-not-allowed opacity-50'}
+        className={item.available ? 'rounded-full border border-transparent font-semibold data-[active=true]:border-orange-500/20 data-[active=true]:bg-orange-500/10 data-[active=true]:text-orange-500' : 'cursor-not-allowed opacity-50'}
       >
         {isLink ? (
           <Link href={item.href}>
@@ -94,19 +95,16 @@ export default function AppSidebar() {
   const isActive = (href) => href && (pathname === href || pathname?.startsWith(`${href}/`))
 
   return (
-    <Sidebar collapsible="icon">
-      <SidebarHeader>
+    <Sidebar collapsible="icon" className="border-r border-slate-700">
+      <SidebarHeader className="pt-4">
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton asChild size="lg">
               <Link href="/flares">
-                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-orange-600">
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-orange-600">
                   <Radar className="h-5 w-5 text-white" />
                 </span>
-                <span className="text-lg font-bold tracking-tight">
-                  <span className="text-slate-400">i</span>
-                  <span className="text-orange-500">FLARE</span>
-                </span>
+                <span className="text-lg font-semibold tracking-[-0.03em] text-slate-100">iFLARE</span>
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>
@@ -142,8 +140,9 @@ export default function AppSidebar() {
       </SidebarContent>
 
       <SidebarFooter>
-        <p className="px-2 text-xs text-muted-foreground group-data-[collapsible=icon]:hidden">
-          Real connections. Right now.
+        <div className="px-2 group-data-[collapsible=icon]:hidden"><ThemeToggle /></div>
+        <p className="border-t border-slate-700 px-2 pt-4 text-xs leading-5 text-muted-foreground group-data-[collapsible=icon]:hidden">
+          Campus plans, while they&apos;re still happening.
         </p>
       </SidebarFooter>
 

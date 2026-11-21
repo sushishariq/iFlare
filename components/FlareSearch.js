@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useMemo } from 'react'
 import { Input } from '@/components/ui/input'
-import { Search, X, Sparkles } from 'lucide-react'
+import { Search, X } from 'lucide-react'
 import { INTERESTS, INTEREST_MAP } from '@/lib/interests'
 
 /**
@@ -87,10 +87,7 @@ export default function FlareSearch({
 
       {focused && (
         <div className="absolute left-0 right-0 top-full z-30 mt-2 rounded-xl border border-slate-700 bg-slate-900 p-3 shadow-xl">
-          <p className="mb-2 flex items-center gap-1.5 text-xs font-medium text-slate-400">
-            <Sparkles className="h-3 w-3 text-orange-400" />
-            Browse by interest
-          </p>
+          <p className="mb-2 text-xs font-medium text-slate-400">Browse by interest</p>
           <div className="flex flex-wrap gap-1.5">
             {recommended.map((interest) => {
               const selected = activeFilter === interest.id

@@ -4,72 +4,85 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-    --primary: 24.6 95% 53.1%;
-    --primary-foreground: 60 9.1% 97.8%;
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 24.6 95% 53.1%;
-    --radius: 0.75rem;
+    --background: 50 33% 94%;
+    --foreground: 75 10% 9%;
+    --card: 48 29% 97%;
+    --card-foreground: 75 10% 9%;
+    --popover: 48 29% 97%;
+    --popover-foreground: 75 10% 9%;
+    --primary: 82 34% 49%;
+    --primary-foreground: 75 15% 8%;
+    --secondary: 75 10% 12%;
+    --secondary-foreground: 50 33% 94%;
+    --muted: 62 18% 88%;
+    --muted-foreground: 72 8% 38%;
+    --accent: 76 34% 83%;
+    --accent-foreground: 78 28% 25%;
+    --destructive: 3 60% 43%;
+    --destructive-foreground: 30 33% 98%;
+    --border: 65 16% 76%;
+    --input: 65 16% 76%;
+    --ring: 82 34% 49%;
+    --radius: 1rem;
 
-    --sidebar-background: 0 0% 98%;
-    --sidebar-foreground: 222.2 47.4% 11.2%;
-    --sidebar-primary: 24.6 95% 53.1%;
-    --sidebar-primary-foreground: 60 9.1% 97.8%;
-    --sidebar-accent: 210 40% 96.1%;
-    --sidebar-accent-foreground: 222.2 47.4% 11.2%;
-    --sidebar-border: 214.3 31.8% 91.4%;
-    --sidebar-ring: 24.6 95% 53.1%;
+    --sidebar-background: 48 29% 97%;
+    --sidebar-foreground: 75 10% 9%;
+    --sidebar-primary: 82 34% 49%;
+    --sidebar-primary-foreground: 75 15% 8%;
+    --sidebar-accent: 68 22% 89%;
+    --sidebar-accent-foreground: 78 28% 25%;
+    --sidebar-border: 65 16% 78%;
+    --sidebar-ring: 82 34% 49%;
+
+    --slate-50: 75 10% 9%; --slate-100: 75 10% 12%; --slate-200: 74 8% 20%;
+    --slate-300: 72 7% 29%; --slate-400: 72 6% 39%; --slate-500: 70 5% 49%;
+    --slate-600: 65 11% 74%; --slate-700: 62 14% 84%; --slate-800: 55 20% 90%;
+    --slate-900: 50 33% 94%; --slate-950: 48 29% 97%;
+    --brand-50: 78 32% 95%; --brand-100: 78 35% 89%; --brand-200: 80 37% 79%;
+    --brand-300: 81 39% 68%; --brand-400: 82 36% 59%; --brand-500: 82 34% 49%;
+    --brand-600: 82 36% 39%; --brand-700: 82 35% 31%; --brand-800: 81 33% 24%;
+    --brand-900: 80 31% 18%; --brand-950: 78 34% 10%;
+    --plum-400: 82 36% 59%; --plum-500: 82 34% 49%; --plum-600: 82 36% 39%;
+    --soft-400: 82 36% 59%; --soft-500: 82 34% 49%; --soft-600: 82 36% 39%;
   }
 
-  /*
-   * iFLARE ships dark-only today. These values intentionally mirror the
-   * slate-950/slate-900/orange-500 palette the pages already hardcode, so
-   * shadcn primitives (which read these tokens) render on-brand instead of
-   * the stock neutral theme they'd otherwise pick up.
-   */
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-    --card: 222.2 47.4% 11.2%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222.2 47.4% 11.2%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 24.6 95% 53.1%;
-    --primary-foreground: 60 9.1% 97.8%;
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 24.6 95% 53.1%;
-
-    --sidebar-background: 222.2 47.4% 11.2%;
-    --sidebar-foreground: 210 40% 98%;
-    --sidebar-primary: 24.6 95% 53.1%;
-    --sidebar-primary-foreground: 60 9.1% 97.8%;
-    --sidebar-accent: 217.2 32.6% 17.5%;
-    --sidebar-accent-foreground: 210 40% 98%;
-    --sidebar-border: 217.2 32.6% 17.5%;
-    --sidebar-ring: 24.6 95% 53.1%;
+    color-scheme: dark;
+    --background: 75 10% 9%;
+    --foreground: 50 33% 94%;
+    --card: 75 10% 12%;
+    --card-foreground: 50 33% 94%;
+    --popover: 75 10% 12%;
+    --popover-foreground: 50 33% 94%;
+    --primary: 82 39% 65%;
+    --primary-foreground: 75 15% 8%;
+    --secondary: 50 33% 91%;
+    --secondary-foreground: 75 10% 9%;
+    --muted: 75 8% 16%;
+    --muted-foreground: 60 9% 67%;
+    --accent: 80 19% 20%;
+    --accent-foreground: 80 40% 78%;
+    --border: 75 7% 25%;
+    --input: 75 7% 27%;
+    --ring: 82 39% 65%;
+    --sidebar-background: 75 11% 10%;
+    --sidebar-foreground: 50 33% 94%;
+    --sidebar-primary: 82 39% 65%;
+    --sidebar-primary-foreground: 75 15% 8%;
+    --sidebar-accent: 78 11% 17%;
+    --sidebar-accent-foreground: 80 40% 78%;
+    --sidebar-border: 75 7% 22%;
+    --sidebar-ring: 82 39% 65%;
+    --slate-50: 50 33% 97%; --slate-100: 50 33% 94%; --slate-200: 55 22% 84%;
+    --slate-300: 58 13% 72%; --slate-400: 60 9% 63%; --slate-500: 65 6% 49%;
+    --slate-600: 70 7% 35%; --slate-700: 72 7% 26%; --slate-800: 74 8% 18%;
+    --slate-900: 75 10% 12%; --slate-950: 75 10% 9%;
+    --brand-50: 80 22% 14%; --brand-100: 80 23% 18%; --brand-200: 81 27% 27%;
+    --brand-300: 81 33% 45%; --brand-400: 82 39% 65%; --brand-500: 82 37% 57%;
+    --brand-600: 82 35% 48%; --brand-700: 82 34% 38%; --brand-800: 81 32% 29%;
+    --brand-900: 80 29% 21%; --brand-950: 78 30% 12%;
+    --plum-400: 82 39% 65%; --plum-500: 82 37% 57%; --plum-600: 82 35% 48%;
+    --soft-400: 82 39% 65%; --soft-500: 82 37% 57%; --soft-600: 82 35% 48%;
   }
 }
 
@@ -79,6 +92,9 @@
   }
   body {
     @apply bg-background text-foreground;
+    min-width: 320px;
+    background-image: radial-gradient(circle at 10% -8%, hsl(var(--primary) / 0.09), transparent 34rem);
+    font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     font-feature-settings: "rlig" 1, "calt" 1;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
@@ -94,10 +110,44 @@
   .app-column {
     @apply mx-auto w-full max-w-[var(--app-column-width)];
   }
+
+  .material-panel {
+    @apply border border-slate-700 bg-slate-950/90;
+    box-shadow: 0 1px 0 hsl(var(--foreground) / 0.03) inset, 0 18px 50px hsl(75 20% 5% / 0.10);
+  }
+
+  .eyebrow {
+    @apply text-xs font-bold uppercase tracking-[0.18em] text-orange-500;
+  }
+}
+
+.display-type {
+  font-family: Impact, Haettenschweiler, "Arial Narrow Bold", "Arial Narrow", sans-serif;
+  font-stretch: condensed;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.scribble-underline {
+  position: relative;
+  isolation: isolate;
+}
+
+.scribble-underline::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  left: -0.03em;
+  right: -0.03em;
+  bottom: 0.06em;
+  height: 0.17em;
+  border-radius: 999px 45% 999px 40%;
+  background: hsl(var(--primary) / 0.28);
+  transform: rotate(-1.5deg);
 }
 
 :root {
-  --app-column-width: 30rem;
+  --app-column-width: 46rem;
 }
 
 /* Custom scrollbar for mobile-first design */
@@ -118,9 +168,26 @@
   background: rgba(255, 255, 255, 0.2);
 }
 
-/* Smooth transitions */
-* {
-  transition-property: color, background-color, border-color, text-decoration-color, fill, stroke, opacity, box-shadow, transform, filter, backdrop-filter;
-  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-  transition-duration: 150ms;
+::selection {
+  background: hsl(var(--primary) / 0.32);
+  color: hsl(var(--foreground));
+}
+
+:focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 3px;
+}
+
+input:not([type="checkbox"]):not([type="radio"]),
+textarea {
+  color: hsl(var(--foreground)) !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

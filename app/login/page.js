@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Radar, ArrowLeft, Eye, EyeOff, Mail, Loader2, AlertCircle } from 'lucide-react'
 import { resolveUniversity } from '@/lib/universities'
+import ThemeToggle from '@/components/ThemeToggle'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -83,7 +84,7 @@ export default function LoginPage() {
 
   return (
     <main className="min-h-screen bg-background">
-      <div className="app-column flex min-h-screen flex-col px-6 py-8">
+      <div className="app-column flex min-h-screen max-w-lg flex-col px-6 py-8">
         {/* Header */}
         <div className="mb-12 flex items-center justify-between">
           <button
@@ -99,7 +100,7 @@ export default function LoginPage() {
             <span className="text-lg font-bold">iFLARE</span>
           </div>
 
-          <div className="w-10" />
+          <ThemeToggle className="scale-90 origin-right" />
         </div>
 
         {/* Login form — a real <form> so Enter submits from either field. */}

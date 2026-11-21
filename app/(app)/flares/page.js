@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
-import { Radar, Plus, Clock, Sparkles, Bell, Zap } from 'lucide-react'
+import { Radar, Plus, Clock, Bell, Zap } from 'lucide-react'
 import { useNotificationContext } from '@/lib/NotificationProvider'
 import FlareCard from '@/components/FlareCard'
 import FlareDetailModal from '@/components/FlareDetailModal'
@@ -255,15 +255,15 @@ export default function FlaresPage() {
   return (
     <main>
       {/* Header */}
-      <header className="mb-4 flex items-center justify-between gap-2 py-2">
+      <header className="mb-5 flex items-end justify-between gap-2 border-b border-white/[0.06] pb-5">
         {/* The shell owns the wordmark now — sidebar on desktop, sticky bar on
             mobile — so this header is just the page title. */}
-        <h1 className="text-xl font-bold tracking-tight">Flares</h1>
+        <div><p className="eyebrow mb-1">Right now</p><h1 className="text-3xl font-semibold tracking-[-0.035em] text-slate-50">Flares</h1></div>
 
         <Link
           href="/notifications"
           aria-label={`Notifications${unreadCount > 0 ? ` (${unreadCount} unread)` : ''}`}
-          className="relative flex h-10 w-10 items-center justify-center rounded-full bg-slate-800/50 text-slate-400 transition-colors hover:text-white"
+          className="relative flex h-10 w-10 items-center justify-center rounded-xl border border-white/[0.08] bg-slate-900 text-slate-400 shadow-[inset_0_1px_0_rgba(255,255,255,.05),0_2px_0_#11110f] transition-colors hover:text-white active:translate-y-0.5 active:shadow-none"
         >
           <Bell className="h-5 w-5" />
           {unreadCount > 0 && (
@@ -278,7 +278,7 @@ export default function FlaresPage() {
       <div
         role="tablist"
         aria-label="Flare mode"
-        className="mb-5 grid grid-cols-2 gap-1 rounded-2xl border border-slate-800 bg-slate-900/60 p-1"
+        className="mb-6 grid grid-cols-2 gap-1.5 rounded-2xl border border-white/[0.07] bg-slate-950/65 p-1.5 shadow-[inset_0_2px_6px_rgba(0,0,0,.25)]"
       >
         {[
           { id: 'join', label: 'Join iFlare', icon: Zap },
@@ -291,7 +291,7 @@ export default function FlaresPage() {
             onClick={() => setMode(id)}
             className={`flex items-center justify-center gap-2 rounded-xl py-3 text-sm font-semibold transition-colors ${
               mode === id
-                ? 'bg-orange-600 text-white shadow'
+                ? 'border border-orange-400/30 bg-orange-600 text-white shadow-[inset_0_1px_0_rgba(255,255,255,.16),0_2px_0_hsl(var(--brand-800))]'
                 : 'text-slate-400 hover:bg-slate-800/60 hover:text-white'
             }`}
           >
@@ -323,7 +323,7 @@ export default function FlaresPage() {
             </button>
           )}
 
-          <div className="mb-5 rounded-xl border border-orange-500/20 bg-orange-500/10 px-4 py-3">
+          <div className="mb-6 rounded-2xl border border-orange-500/20 bg-orange-500/[.07] px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,.035)]">
             <div className="flex items-center gap-2 text-sm text-orange-400">
               <Radar className="h-4 w-4" />
               <span>
@@ -361,7 +361,6 @@ export default function FlaresPage() {
           {happeningNow.length > 0 && (
             <section className="mb-6">
               <div className="mb-3 flex items-center gap-2">
-                <Sparkles className="h-5 w-5 text-green-400" />
                 <h2 className="text-lg font-semibold">Happening Now</h2>
                 <span className="text-sm text-slate-500">{happeningNow.length}</span>
               </div>
@@ -381,7 +380,6 @@ export default function FlaresPage() {
 
           {filteredFlares.length === 0 && (
             <div className="py-12 text-center">
-              <Sparkles className="mx-auto mb-3 h-12 w-12 text-slate-600" />
               <p className="text-slate-400">
                 {searchQuery || activeFilter !== 'all'
                   ? 'Nothing matches that right now'
@@ -392,8 +390,8 @@ export default function FlaresPage() {
           )}
 
           {/* Create prompt at the end of the feed */}
-          <div className="mt-2 rounded-2xl border border-dashed border-slate-700 bg-slate-900/40 p-5 text-center">
-            <p className="mb-1 font-medium text-white">Nothing here for you?</p>
+          <div className="mt-3 rounded-2xl border border-dashed border-slate-700 bg-slate-900/55 p-6 text-center">
+            <p className="mb-1 font-semibold text-slate-100">Nothing here for you?</p>
             <p className="mb-4 text-sm text-slate-400">
               Post what you&apos;re doing and let people come to you.
             </p>

@@ -44,7 +44,7 @@
 | Icons          | lucide-react (Radar is the brand mark)             |
 | Database       | MongoDB (local in preview, managed in production)  |
 | Auth           | Custom (email + SHA-256 password + base64 token)   |
-| Email (opt-in) | Resend (currently disabled in the signup flow)     |
+| Email          | SMTP via Nodemailer (Gmail App Password supported) |
 | Process mgr    | supervisor (nextjs on `0.0.0.0:3000`)              |
 
 ---
@@ -107,7 +107,13 @@ Frontend hot-reload picks up file edits automatically.
 | `MONGO_URL`             | MongoDB connection string                                        |
 | `DB_NAME`               | Database name (currently `iflare`)                                |
 | `NEXT_PUBLIC_BASE_URL`  | Public base URL of the preview / production app                  |
-| `RESEND_API_KEY`        | Resend API key (email verification, currently disabled in flow)  |
+| `SMTP_HOST`             | SMTP hostname; use `smtp.gmail.com` for Gmail                     |
+| `SMTP_PORT`             | SMTP port; use `465` for Gmail TLS                                |
+| `SMTP_SECURE`           | `true` for port 465, `false` for STARTTLS on port 587             |
+| `SMTP_USER`             | Gmail/SMTP account username                                       |
+| `SMTP_PASS`             | Gmail App Password or SMTP password                               |
+| `SMTP_FROM_NAME`        | Display name for outgoing mail                                    |
+| `SMTP_FROM_EMAIL`       | Sender address; Gmail normally uses the authenticated account     |
 | `CORS_ORIGINS`          | Optional CORS override (default `*`)                             |
 
 > ⚠️ Never edit `MONGO_URL` or `NEXT_PUBLIC_BASE_URL` — these are managed
@@ -209,7 +215,7 @@ Preview data does **not** travel to production and vice-versa.
 
 ## 🗺 Roadmap / Backlog
 
-- Re-enable email verification via Resend
+- For Gmail delivery, enable Google 2-Step Verification and create an App Password
 - Google Login (postponed)
 - Google Maps venue picker (currently free-text `location.name`)
 - Password reset flow

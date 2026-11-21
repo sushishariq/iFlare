@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Radar, ArrowRight, ArrowLeft, Mail, Lock, Loader2, Eye, EyeOff } from 'lucide-react'
 import { resolveUniversity } from '@/lib/universities'
+import ThemeToggle from '@/components/ThemeToggle'
 
 export default function ForgotPasswordPage() {
   const router = useRouter()
@@ -129,7 +130,7 @@ export default function ForgotPasswordPage() {
           <Radar className="w-6 h-6 text-orange-500" />
           <h1 className="text-lg font-bold">iFLARE</h1>
         </div>
-        <div className="w-10" />
+        <ThemeToggle className="scale-90 origin-right" />
       </div>
 
       {/* Progress */}

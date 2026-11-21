@@ -24,7 +24,7 @@ For the full feature list see [`README.md`](./README.md).
 | Forms/validation   | react-hook-form + zod                                            |
 | Database           | MongoDB via the `mongodb` driver (local in preview, managed in production) |
 | Auth               | Custom — SHA-256 password hash + base64 JSON session token (see Security section — **not production-grade**) |
-| Email (opt-in)     | Resend (`resend` npm package) — mostly disabled in current flows |
+| Email              | SMTP through Nodemailer; Gmail App Password supported            |
 | Package manager    | yarn                                                              |
 | Process manager    | `supervisor` — runs Next.js on `0.0.0.0:3000`                    |
 
@@ -98,7 +98,8 @@ automatically — no restart needed for normal code changes.
 **Env vars** (`/app/.env`): `MONGO_URL`, `DB_NAME` (`iflare` in production,
 `iflare_dev` on a local dev server — check the value before querying Mongo
 directly),
-`NEXT_PUBLIC_BASE_URL`, `RESEND_API_KEY`, `CORS_ORIGINS`, and
+`NEXT_PUBLIC_BASE_URL`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`,
+`SMTP_PASS`, `SMTP_FROM_NAME`, `SMTP_FROM_EMAIL`, `CORS_ORIGINS`, and
 `NEXT_PUBLIC_CONTACT_EMAIL` (optional — read by `lib/site.js`; when unset the
 Contact/Feedback pages show an honest "not set up yet" state instead of a dead
 `mailto:` link). Never hand-edit

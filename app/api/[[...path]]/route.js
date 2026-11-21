@@ -4,8 +4,8 @@ export const fetchCache = 'force-no-store'
 import { MongoClient } from 'mongodb'
 import { v4 as uuidv4 } from 'uuid'
 import { NextResponse } from 'next/server'
-import { Resend } from 'resend'
 import crypto from 'crypto'
+import { sendMail } from '@/lib/mailer'
 import { resolveUniversity, getDomainFromEmail } from '@/lib/universities'
 import {
   INTEREST_MAP,
@@ -20,7 +20,16 @@ let db
 
 async function connectToMongo() {
   if (!client) {
-    client = new MongoClient(process.env.MONGO_URL)
+    // Local development historically depended on an injected MONGO_URL even
+    // though the documented preview database runs on localhost. Keep
+    // production strict, but make a fresh local checkout work out of the box.
+    const mongoUrl = process.env.MONGO_URL || (
+      process.env.NODE_ENV !== 'production' ? 'mongodb://127.0.0.1:27017' : ''
+    )
+    if (!mongoUrl) {
+      throw new Error('MONGO_URL is required in production')
+    }
+    client = new MongoClient(mongoUrl, { serverSelectionTimeoutMS: 5000 })
     await client.connect()
     db = client.db(process.env.DB_NAME || 'iflare')
   }
@@ -138,9 +147,6 @@ async function resolveUserDomain(db, userId) {
   return { ok: true, user, domain }
 }
 
-// Initialize Resend
-const resend = new Resend(process.env.RESEND_API_KEY)
-
 // Upper bound for the optional profile bio, enforced server-side so the
 // client can't grow a user document without limit.
 const BIO_MAX_LENGTH = 300
@@ -176,9 +182,8 @@ async function sendVerificationEmail(email, name, token) {
   const verificationUrl = `${baseUrl}/verify?token=${token}`
   
   try {
-    const { data, error } = await resend.emails.send({
-      from: 'iFLARE <noreply@iflare.fun>',
-      to: [email],
+    return await sendMail({
+      to: email,
       subject: 'Verify your iFLARE account',
       html: `
         <!DOCTYPE html>
@@ -220,24 +225,17 @@ async function sendVerificationEmail(email, name, token) {
       `
     })
     
-    if (error) {
-      console.error('Resend error:', error)
-      return { success: false, error }
-    }
-    
-    return { success: true, data }
   } catch (error) {
     console.error('Email send error:', error)
     return { success: false, error }
   }
 }
 
-// Send a password-reset OTP via Resend.
+// Send a password-reset OTP via SMTP.
 async function sendPasswordResetEmail(email, name, otp) {
   try {
-    const { data, error } = await resend.emails.send({
-      from: 'iFLARE <noreply@iflare.fun>',
-      to: [email],
+    return await sendMail({
+      to: email,
       subject: `${otp} is your iFLARE password reset code`,
       html: `
         <!DOCTYPE html>
@@ -269,11 +267,6 @@ async function sendPasswordResetEmail(email, name, otp) {
         </html>
       `
     })
-    if (error) {
-      console.error('PasswordReset Resend error:', error)
-      return { success: false, error }
-    }
-    return { success: true, data }
   } catch (error) {
     console.error('PasswordReset send error:', error)
     return { success: false, error }
@@ -292,12 +285,11 @@ function hashOtp(otp) {
   return crypto.createHash('sha256').update(String(otp)).digest('hex')
 }
 
-// Send the OTP email via Resend. Returns { success, error }.
+// Send the OTP email via SMTP. Returns { success, error }.
 async function sendOtpEmail(email, name, otp) {
   try {
-    const { data, error } = await resend.emails.send({
-      from: 'iFLARE <noreply@iflare.fun>',
-      to: [email],
+    return await sendMail({
+      to: email,
       subject: `${otp} is your iFLARE verification code`,
       html: `
         <!DOCTYPE html>
@@ -330,11 +322,6 @@ async function sendOtpEmail(email, name, otp) {
         </html>
       `
     })
-    if (error) {
-      console.error('OTP Resend error:', error)
-      return { success: false, error }
-    }
-    return { success: true, data }
   } catch (error) {
     console.error('OTP send error:', error)
     return { success: false, error }
@@ -493,6 +480,7 @@ async function handleRoute(request, { params }) {
         message: 'OTP sent',
         email: normalizedEmail,
         expiresInSec: 600,
+        ...(mailResult.development ? { developmentOtp: otp } : {}),
       }))
     }
 
@@ -667,6 +655,7 @@ async function handleRoute(request, { params }) {
         message: 'OTP resent',
         email: normalizedEmail,
         expiresInSec: 600,
+        ...(mailResult.development ? { developmentOtp: otp } : {}),
       }))
     }
 
@@ -933,7 +922,7 @@ async function handleRoute(request, { params }) {
       }))
     }
 
-    // Resend verification email
+    // Re-send verification email
     if (route === '/auth/resend-verification' && method === 'POST') {
       const body = await request.json()
       const { email } = body

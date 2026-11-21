@@ -18,6 +18,30 @@ module.exports = {
     	},
     	extend: {
     		colors: {
+				slate: {
+					50: 'hsl(var(--slate-50))', 100: 'hsl(var(--slate-100))', 200: 'hsl(var(--slate-200))',
+					300: 'hsl(var(--slate-300))', 400: 'hsl(var(--slate-400))', 500: 'hsl(var(--slate-500))',
+					600: 'hsl(var(--slate-600))', 700: 'hsl(var(--slate-700))', 800: 'hsl(var(--slate-800))',
+					900: 'hsl(var(--slate-900))', 950: 'hsl(var(--slate-950))'
+				},
+				orange: {
+					50: 'hsl(var(--brand-50))', 100: 'hsl(var(--brand-100))', 200: 'hsl(var(--brand-200))',
+					300: 'hsl(var(--brand-300))', 400: 'hsl(var(--brand-400))', 500: 'hsl(var(--brand-500))',
+					600: 'hsl(var(--brand-600))', 700: 'hsl(var(--brand-700))', 800: 'hsl(var(--brand-800))',
+					900: 'hsl(var(--brand-900))', 950: 'hsl(var(--brand-950))'
+				},
+				green: { 400: 'hsl(var(--soft-400))', 500: 'hsl(var(--soft-500))', 600: 'hsl(var(--soft-600))' },
+				emerald: { 300: 'hsl(var(--brand-300))', 400: 'hsl(var(--brand-400))', 500: 'hsl(var(--brand-500))' },
+				blue: { 400: 'hsl(var(--plum-400))', 500: 'hsl(var(--plum-500))', 600: 'hsl(var(--plum-600))' },
+				yellow: { 400: 'hsl(var(--soft-400))', 500: 'hsl(var(--soft-500))' },
+				amber: { 200: 'hsl(var(--brand-200))', 400: 'hsl(var(--brand-400))', 500: 'hsl(var(--brand-500))' },
+				purple: { 400: 'hsl(var(--brand-400))', 500: 'hsl(var(--brand-500))' },
+				pink: { 400: 'hsl(var(--brand-400))', 500: 'hsl(var(--brand-500))' },
+				violet: { 400: 'hsl(var(--brand-400))', 500: 'hsl(var(--brand-500))' },
+				rose: { 400: 'hsl(var(--brand-400))', 500: 'hsl(var(--brand-500))' },
+				teal: { 400: 'hsl(var(--brand-400))', 500: 'hsl(var(--brand-500))' },
+				lime: { 400: 'hsl(var(--brand-400))', 500: 'hsl(var(--brand-500))' },
+				cyan: { 400: 'hsl(var(--brand-400))', 500: 'hsl(var(--brand-500))' },
     			border: 'hsl(var(--border))',
     			input: 'hsl(var(--input))',
     			ring: 'hsl(var(--ring))',
